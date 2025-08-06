@@ -10,8 +10,6 @@ from mdx2.data import Peaks
 from mdx2.geometry import GaussianPeak
 from mdx2.utils import loadobj, saveobj
 
-# from . import MDX2Parser
-
 
 def parse_arguments():
     """Parse commandline arguments"""
