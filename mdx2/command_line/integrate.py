@@ -27,9 +27,6 @@ def parse_arguments():
     parser.add_argument(
         "--subdivide", nargs=3, metavar="N", type=int, default=[1, 1, 1], help="subdivisions of the Miller index grid"
     )
-    # parser.add_argument(
-    #     "--limits", nargs=6, metavar=("hmin,hmax,kmin,kmax,lmin,lmax"), type=float, help="included region"
-    # )
     parser.add_argument(
         "--max_spread",
         type=float,
