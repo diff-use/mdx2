@@ -5,11 +5,8 @@ Apply corrections to integrated data
 import argparse
 
 import numpy as np
-# import pandas as pd
 
 from mdx2.utils import saveobj, loadobj
-# from mdx2.data import ImageSeries
-# from mdx2.data import HKLTable
 
 def parse_arguments():
     """Parse commandline arguments"""

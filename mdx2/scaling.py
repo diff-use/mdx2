@@ -4,7 +4,7 @@ import copy
 import numpy as np
 from scipy import sparse
 
-from nexusformat.nexus import NXfield, NXdata, NXgroup
+from nexusformat.nexus import NXfield, NXdata
 
 try:
     import xarray as xr

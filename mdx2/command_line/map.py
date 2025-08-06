@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from mdx2.utils import saveobj, loadobj
-# from mdx2.data import ImageSeries
+
 from mdx2.data import HKLTable
 from mdx2.geometry import GridData
 

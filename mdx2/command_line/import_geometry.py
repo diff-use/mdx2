@@ -3,9 +3,6 @@ Import experimental geometry using the dxtbx machinery
 """
 
 import argparse
-import json
-
-import numpy as np
 
 import mdx2.geometry as geom
 from mdx2.utils import saveobj

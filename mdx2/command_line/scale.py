@@ -6,7 +6,6 @@ import argparse
 import os
 
 import numpy as np
-import pandas as pd
 
 from mdx2.utils import saveobj, loadobj
 from mdx2.data import HKLTable

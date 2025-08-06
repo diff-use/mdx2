@@ -5,12 +5,11 @@ Integrate counts in an image stack on a Miller index grid
 import argparse
 
 import numpy as np
-import pandas as pd
+
 from joblib import Parallel, delayed
 from nexusformat.nexus import nxload # mask is too big to read all at once?
 
 from mdx2.utils import saveobj, loadobj
-from mdx2.data import ImageSeries
 from mdx2.data import HKLTable
 
 def parse_arguments():
