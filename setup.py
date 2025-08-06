@@ -1,4 +1,5 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
+
 
 # Get version number
 def getVersionNumber():
@@ -12,7 +13,7 @@ with open('README.md') as f:
     readme = f.read()
 
 with open('LICENSE') as f:
-    license = f.read()
+    license_file = f.read()
 
 setup(
     name='mdx2',
@@ -22,7 +23,7 @@ setup(
     author='Steve P. Meisburger',
     author_email='spm82@cornell.edu',
     url='https://github.com/ando-lab/mdx2',
-    license=license,
+    license=license_file,
     packages=find_packages(exclude=('tests', 'docs')),
     python_requires=">=3.9",
     install_requires=[

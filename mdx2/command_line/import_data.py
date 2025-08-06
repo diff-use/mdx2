@@ -8,6 +8,7 @@ from mdx2.data import ImageSeries
 from mdx2.dxtbx_machinery import ImageSet
 from mdx2.utils import saveobj
 
+
 def parse_arguments():
     """Parse commandline arguments"""
 
@@ -19,9 +20,10 @@ def parse_arguments():
     # Required arguments
     parser.add_argument("expt", help="experiments file, such as from dials.import")
     parser.add_argument("--outfile", default="data.nxs", help="name of the output NeXus file")
-    parser.add_argument("--chunks", nargs=3, type=int, metavar='N', help="chunking for compression (frames, y, x)")
-    parser.add_argument("--nproc", type=int, default=1, metavar='N', help="number of parallel processes")
+    parser.add_argument("--chunks", nargs=3, type=int, metavar="N", help="chunking for compression (frames, y, x)")
+    parser.add_argument("--nproc", type=int, default=1, metavar="N", help="number of parallel processes")
     return parser
+
 
 def run(args=None):
     parser = parse_arguments()
@@ -33,18 +35,19 @@ def run(args=None):
     iset = ImageSet.from_file(exptfile)
 
     if args.chunks is not None:
-        image_series.data.chunks=tuple(args.chunks)
+        image_series.data.chunks = tuple(args.chunks)
 
-    nxs = saveobj(image_series,args.outfile,name='image_series')
+    saveobj(image_series, args.outfile, name="image_series")
 
     nbatches = image_series.data.chunks[0]
-    
+
     if args.nproc == 1:
-        iset.read_all(image_series.data,nbatches)
+        iset.read_all(image_series.data, nbatches)
     else:
-        iset.read_all_parallel(image_series.data,nbatches,args.nproc)
+        iset.read_all_parallel(image_series.data, nbatches, args.nproc)
 
     print("done!")
+
 
 if __name__ == "__main__":
     run()
