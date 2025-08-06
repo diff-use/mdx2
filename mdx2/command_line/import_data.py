@@ -2,11 +2,7 @@
 Import x-ray image data using the dxtbx machinery
 """
 
-#<--- LEFT OFF HERE --->
-
 import argparse
-
-import numpy as np
 
 from mdx2.data import ImageSeries
 from mdx2.dxtbx_machinery import ImageSet

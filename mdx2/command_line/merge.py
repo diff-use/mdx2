@@ -5,7 +5,7 @@ Merge corrected intensities using a scaling model
 import argparse
 
 import numpy as np
-#import pandas as pd
+
 from nexusformat.nexus import nxload
 
 from mdx2.utils import saveobj, loadobj

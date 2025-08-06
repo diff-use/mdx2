@@ -4,8 +4,6 @@ Bin down an image stack
 
 import argparse
 
-import numpy as np
-
 from nexusformat.nexus import nxload # mask is too big to read all at once?
 
 from mdx2.utils import saveobj, loadobj

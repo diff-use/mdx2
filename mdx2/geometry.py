@@ -1,8 +1,7 @@
 import numpy as np
-import re
 import numexpr as ne
 
-from nexusformat.nexus import * # NXsample, NXcollection, NXdata, NXfield
+from nexusformat.nexus import NXgroup, NXdata, NXsample, NXfield
 
 from mdx2.dxtbx_machinery import Experiment
 from mdx2.utils import interp_g2g_trilinear, interp3, interp2
