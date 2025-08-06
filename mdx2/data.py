@@ -348,19 +348,6 @@ class ImageSeries:
             signal = NXfield(self.data, name="data")
         return NXdata(signal=signal, axes=[phi, iy, ix], exposure_times=self.exposure_times)
 
-    #    def find_peaks_above_threshold(self,threshold,verbose=True):
-    #        """find pixels above a threshold"""
-    #        peaklist = []
-    #        for ind,ims in enumerate(self.iter_chunks()):
-    #            im_data = ims.data_masked
-    #            peaks = Peaks.where(im_data>threshold,ims.phi,ims.iy,ims.ix)
-    #            if peaks.size:
-    #                if verbose: print(f'found {peaks.size} peaks in chunk {ind}')
-    #                peaklist.append(peaks)
-    #        peaks = Peaks.stack(peaklist)
-    #        if verbose: print(f'found {peaks.size} peaks in total')
-    #        return peaks
-
     def find_peaks_above_threshold(self, threshold, verbose=True, nproc=1):
         """find pixels above a threshold"""
 
