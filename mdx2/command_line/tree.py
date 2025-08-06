@@ -12,10 +12,12 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument("filename", help="NeXus file name")
 
+
 def run(args=None):
     args = parser.parse_args(args)
-    nxs = nxload(args.filename,'r')
-    print(f"{args.filename}:",nxs.tree)
+    nxs = nxload(args.filename, "r")
+    print(f"{args.filename}:", nxs.tree)
+
 
 if __name__ == "__main__":
     run()
