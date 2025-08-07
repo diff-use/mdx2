@@ -13,3 +13,8 @@ docstring-code-line-length = "dynamic"
 [tool.ruff.lint]
 select = ["E", "F", "W", "A", "PLC", "PLE", "PLW", "I"]
 ignore = ["E741", "F541"]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
