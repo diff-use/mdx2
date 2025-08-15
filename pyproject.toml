@@ -15,11 +15,12 @@ dependencies = [
     "numpy",
     "pandas",
     "scipy",
-    "dxtbx",  # needs to be installed with conda
+    "dxtbx", 
     "nexusformat",
     "joblib",
     "numexpr",
 ]
+# dxtbx needs to be installed with conda
 
 [project.optional-dependencies]
 test = ["pytest>=6.0"]
@@ -40,6 +41,9 @@ repository = "https://github.com/diff-use/mdx2"
 "mdx2.merge" = "mdx2.command_line.merge:run"
 "mdx2.map" = "mdx2.command_line.map:run"
 "mdx2.scale" = "mdx2.command_line.scale:run"
+
+[tool.setuptools_scm]
+version_file = "mdx2/VERSION"
 
 [tool.ruff]
 line-length = 120
