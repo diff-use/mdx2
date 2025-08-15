@@ -1,3 +1,46 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mdx2"
+dynamic = ["version"]
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { email = "spm82@cornell.edu", name = "Steve Meisburger" },
+]
+requires-python = ">= 3.9"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "dxtbx",  # needs to be installed with conda
+    "nexusformat",
+    "joblib",
+    "numexpr",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=6.0"]
+
+[project.urls]
+repository = "https://github.com/diff-use/mdx2"
+
+[project.scripts]
+"mdx2.version" = "mdx2.command_line.version:run"
+"mdx2.import_data" = "mdx2.command_line.import_data:run"
+"mdx2.import_geometry" = "mdx2.command_line.import_geometry:run"
+"mdx2.find_peaks" = "mdx2.command_line.find_peaks:run"
+"mdx2.mask_peaks" = "mdx2.command_line.mask_peaks:run"
+"mdx2.tree" = "mdx2.command_line.tree:run"
+"mdx2.bin_image_series" = "mdx2.command_line.bin_image_series:run"
+"mdx2.integrate" = "mdx2.command_line.integrate:run"
+"mdx2.correct" = "mdx2.command_line.correct:run"
+"mdx2.merge" = "mdx2.command_line.merge:run"
+"mdx2.map" = "mdx2.command_line.map:run"
+"mdx2.scale" = "mdx2.command_line.scale:run"
+
 [tool.ruff]
 line-length = 120
 indent-width = 4

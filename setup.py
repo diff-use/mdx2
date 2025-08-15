@@ -1,57 +1,24 @@
-from setuptools import find_packages, setup
+import sys
+
+sys.stderr.write(
+    """
+===============================
+Unsupported installation method
+===============================
+mdx2 does not support installation with `python setup.py install`.
+Please use `python -m pip install .` instead.
+"""
+)
+sys.exit(1)
 
 
-# Get version number
-def getVersionNumber():
-    with open("mdx2/VERSION", "r") as vfile:
-        version = vfile.read().strip()
-    return version
+# The below code will never execute, however GitHub is particularly
+# picky about where it finds Python packaging metadata.
+# See: https://github.com/github/feedback/discussions/6456
+#
+# To be removed once GitHub catches up.
 
-
-__version__ = getVersionNumber()
-
-with open("README.md") as f:
-    readme = f.read()
-
-with open("LICENSE") as f:
-    license_file = f.read()
-
-setup(
+setup(  # noqa
     name="mdx2",
-    version=__version__,
-    description="mdx2: macromolecular diffuse scattering data reduction in python",
-    long_description=readme,
-    author="Steve P. Meisburger",
-    author_email="spm82@cornell.edu",
-    url="https://github.com/ando-lab/mdx2",
-    license=license_file,
-    packages=find_packages(exclude=("tests", "docs")),
-    python_requires=">=3.9",
-    install_requires=[
-        "numpy",
-        "pandas",
-        "scipy",
-        "dxtbx",  # needs to be installed with conda
-        "nexusformat",
-        "joblib",
-        "numexpr",
-    ],
-    tests_require=["pytest"],
-    entry_points={
-        "console_scripts": [
-            "mdx2.version=mdx2.command_line.version:run",
-            "mdx2.import_data=mdx2.command_line.import_data:run",
-            "mdx2.import_geometry=mdx2.command_line.import_geometry:run",
-            "mdx2.find_peaks=mdx2.command_line.find_peaks:run",
-            "mdx2.mask_peaks=mdx2.command_line.mask_peaks:run",
-            "mdx2.tree=mdx2.command_line.tree:run",
-            "mdx2.bin_image_series=mdx2.command_line.bin_image_series:run",
-            "mdx2.integrate=mdx2.command_line.integrate:run",
-            "mdx2.correct=mdx2.command_line.correct:run",
-            "mdx2.merge=mdx2.command_line.merge:run",
-            "mdx2.map=mdx2.command_line.map:run",
-            "mdx2.scale=mdx2.command_line.scale:run",
-        ],
-    },
-    include_package_data=True,
+    install_requires=[],
 )
