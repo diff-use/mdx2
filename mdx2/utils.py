@@ -11,13 +11,26 @@ import mdx2
 # FUNCTIONS FOR LOADING AND SAVING MDX2 CLASSES TO NEXUS FILES
 
 
+class DifferentVersionException(Exception):
+    """
+    Raised when the mdx2 version in a nexus file does not match the installed version.
+    """
+
+    def __init__(self, message, file_version=None, installed_version=None):
+        super().__init__(message)  # Call the base Exception class's constructor
+        self.file_version = file_version
+        self.installed_version = installed_version
+
+
 def nxload(filename, mode="r", **kwargs):
     """Wrapper around nexusformat.nexus.nxload to check mdx2 version."""
     nxroot = nexus_nxload(filename, mode=mode, **kwargs)
     mdx2_version_file = nxroot.attrs.get("mdx2_version")
     if mdx2_version_file != mdx2.__version__:
-        logging.warning(
-            f"mdx2 version in {filename} ({mdx2_version_file}) does not match installed version {mdx2.__version__}."
+        raise DifferentVersionException(
+            f"mdx2 version mismatch: file version {mdx2_version_file}, installed version {mdx2.__version__}",
+            file_version=mdx2_version_file,
+            installed_version=mdx2.__version__,
         )
     return nxroot
 
@@ -37,7 +50,11 @@ def loadobj(filename, objectname, verbose=True):
     # does a from_nexus() call to instantiate the class
     if verbose:
         print(f"Reading {objectname} from {filename}")
-    nxs = nxload(filename, "r")["/entry/" + objectname]
+    try:
+        nxs = nxload(filename, "r")["/entry/" + objectname]
+    except DifferentVersionException as e:
+        logging.error(f"An error occured: {e}")
+        # TODO: use version information to handle compatibility issues
     mod = nxs.attrs["mdx2_module"]
     cls = nxs.attrs["mdx2_class"]
     _tmp = importlib.__import__(mod, fromlist=[cls])
