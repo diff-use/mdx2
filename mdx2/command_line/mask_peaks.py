@@ -11,7 +11,7 @@ from mdx2.geometry import GridData
 from mdx2.utils import loadobj, saveobj
 
 
-def parse_arguments():
+def parse_arguments(args=None):
     """Parse commandline arguments"""
 
     parser = argparse.ArgumentParser(
@@ -30,18 +30,26 @@ def parse_arguments():
     parser.add_argument("--nproc", type=int, default=1, metavar="N", help="number of parallel processes")
     parser.add_argument("--bragg", action="store_true", help="create a Bragg peak mask instead")
 
-    return parser
+    params = parser.parse_args(args)
+
+    return params
 
 
-def run(args=None):
-    parser = parse_arguments()
-    args = parser.parse_args(args)
+def run_mask_peaks(params):
+    """Run the mask peaks script"""
+    geom = params.geom
+    data = params.data
+    peaks = params.peaks
+    outfile = params.outfile
+    sigma_cutoff = params.sigma_cutoff
+    nproc = params.nproc
+    bragg = params.bragg
 
-    MI = loadobj(args.geom, "miller_index")
-    Symm = loadobj(args.geom, "symmetry")
-    IS = loadobj(args.data, "image_series")
-    GP = loadobj(args.peaks, "peak_model")
-    P = loadobj(args.peaks, "peaks")
+    MI = loadobj(geom, "miller_index")
+    Symm = loadobj(geom, "symmetry")
+    IS = loadobj(data, "image_series")
+    GP = loadobj(peaks, "peak_model")
+    P = loadobj(peaks, "peaks")
 
     # initialize the mask using Peaks
     mask = np.zeros(IS.shape, dtype="bool")
@@ -55,22 +63,22 @@ def run(args=None):
         dk = MIdense.k - K
         dl = MIdense.l - L
         isrefl = Symm.is_reflection(H, K, L)
-        return isrefl & GP.mask(dh, dk, dl, sigma_cutoff=args.sigma_cutoff)
+        return isrefl & GP.mask(dh, dk, dl, sigma_cutoff=sigma_cutoff)
 
     # loop over phi values
-    print(f"masking peaks with sigma above threshold: {args.sigma_cutoff}")
+    print(f"masking peaks with sigma above threshold: {sigma_cutoff}")
 
-    if args.nproc == 1:
+    if nproc == 1:
         for ind, sl in enumerate(IS.chunk_slice_iterator()):
             print(f"indexing chunk {ind}")
             mask[sl] = maskchunk(sl)
     else:
-        with Parallel(n_jobs=args.nproc, verbose=10) as parallel:
+        with Parallel(n_jobs=nproc, verbose=10) as parallel:
             masklist = parallel(delayed(maskchunk)(sl) for sl in IS.chunk_slice_iterator())
         for msk, sl in zip(masklist, IS.chunk_slice_iterator()):
             mask[sl] = msk  # <-- note, this copy step could be avoided with shared mem
 
-    if args.bragg:
+    if bragg:
         print("inverting mask to retain Bragg peaks")
         mask = np.logical_not(mask)
     else:
@@ -78,12 +86,18 @@ def run(args=None):
         P.to_mask(IS.phi, IS.iy, IS.ix, mask_in=mask)
 
     # add peaks
-    print(f"Saving mask to {args.outfile}")
+    print(f"Saving mask to {outfile}")
 
     maskobj = GridData((IS.phi, IS.iy, IS.ix), mask)
-    saveobj(maskobj, args.outfile, name="mask", append=False)
+    saveobj(maskobj, outfile, name="mask", append=False)
 
     print("done!")
+
+
+def run(args=None):
+    """Run the mask peaks script"""
+    params = parse_arguments(args=args)
+    run_mask_peaks(params)
 
 
 if __name__ == "__main__":

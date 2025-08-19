@@ -6,13 +6,16 @@ import argparse
 
 import numpy as np
 from joblib import Parallel, delayed
-from nexusformat.nexus import nxload  # mask is too big to read all at once?
 
 from mdx2.data import HKLTable
-from mdx2.utils import loadobj, saveobj
+from mdx2.utils import (
+    loadobj,
+    nxload,  # mask is too big to read all at once?
+    saveobj,
+)
 
 
-def parse_arguments():
+def parse_arguments(args=None):
     """Parse commandline arguments"""
 
     parser = argparse.ArgumentParser(
@@ -36,21 +39,27 @@ def parse_arguments():
     )
     parser.add_argument("--outfile", default="integrated.nxs", help="name of the output NeXus file")
     parser.add_argument("--nproc", type=int, default=1, metavar="N", help="number of parallel processes")
+    params = parser.parse_args(args)
+    return params
 
-    return parser
 
+def run_integrate(params):
+    """Run the integrate script"""
+    geom = params.geom
+    data = params.data
+    outfile = params.outfile
+    nproc = params.nproc
+    ndiv = params.subdivide
+    max_degrees = params.max_spread
+    maskfile = params.mask
 
-def run(args=None):
-    parser = parse_arguments()
-    args = parser.parse_args(args)
+    MI = loadobj(geom, "miller_index")
+    IS = loadobj(data, "image_series")
 
-    MI = loadobj(args.geom, "miller_index")
-    IS = loadobj(args.data, "image_series")
-
-    if args.mask is not None:
-        # MA = loadobj(args.mask,'mask')
+    if maskfile is not None:
+        # MA = loadobj(maskfile,'mask')
         # mask = MA.data
-        nxs = nxload(args.mask)  # <-- loadobj fails if the array is too large. weird
+        nxs = nxload(maskfile)  # <-- loadobj fails if the array is too large. weird
         mask = nxs.entry.mask.signal  # nxfield
 
     else:
@@ -61,10 +70,6 @@ def run(args=None):
     # else:
     #    lim = None
 
-    ndiv = args.subdivide
-
-    max_degrees = args.max_spread
-
     def intchunk(sl):
         ims = IS[sl]
         if mask is not None:
@@ -74,14 +79,14 @@ def run(args=None):
         tab.ndiv = ndiv
         return tab.bin(count_name="pixels")
 
-    if args.nproc == 1:
+    if nproc == 1:
         T = []  # list of tables
         print("Looping through chunks")
         for ind, sl in enumerate(IS.chunk_slice_iterator()):
             T.append(intchunk(sl))
             print(f"  binned chunk {ind}")
     else:
-        with Parallel(n_jobs=args.nproc, verbose=10) as parallel:
+        with Parallel(n_jobs=nproc, verbose=10) as parallel:
             T = parallel(delayed(intchunk)(sl) for sl in IS.chunk_slice_iterator())
 
     print(f"Summing partial observations over {len(T)} chunks")
@@ -101,7 +106,7 @@ def run(args=None):
 
     print(f"  binned from {np.sum([len(t) for t in T])} to {len(df)} voxels")
 
-    print(f"Saving table of integrated data to {args.outfile}")
+    print(f"Saving table of integrated data to {outfile}")
 
     hkl_table = HKLTable.from_frame(df)
     hkl_table.ndiv = ndiv  # lost in conversion to/from dataframe
@@ -116,9 +121,15 @@ def run(args=None):
     hkl_table.counts = hkl_table.counts.astype(np.int32)
     hkl_table.pixels = hkl_table.pixels.astype(np.int32)
 
-    saveobj(hkl_table, args.outfile, name="hkl_table", append=False)
+    saveobj(hkl_table, outfile, name="hkl_table", append=False)
 
     print("done!")
+
+
+def run(args=None):
+    """Run the integrate script"""
+    params = parse_arguments(args=args)
+    run_integrate(params)
 
 
 if __name__ == "__main__":
