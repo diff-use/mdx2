@@ -298,7 +298,7 @@ def parse_arguments(args=None):
         elif getattr(params, param) in [False, "False", "false", "0", "F", "f"]:
             setattr(params, param, False)
         else:
-            raise ValueError(f"Invalid value for {param}: {getattr(params, param)}. Must be True or False.")
+            raise SystemExit(f"Invalid value for {param}: {getattr(params, param)}. Must be True or False.")
 
     if params.mca2020:
         params.scaling_enable = True
@@ -320,7 +320,7 @@ def parse_arguments(args=None):
     if params.outfile is None:
         params.outfile = generate_default_outfiles(params.hkl)
         if params.outfile is None:
-            raise ValueError("unable to auto-generate output file names from input name pattern")
+            raise SystemExit("unable to auto-generate output file names from input name pattern")
 
     return params
 

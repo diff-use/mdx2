@@ -42,6 +42,9 @@ def parse_arguments(args=None):
 
     params = parser.parse_args(args)
 
+    if params.split == "Friedel" and params.geometry is None:
+        raise SystemExit("--geometry argument is required for symmetry-based splitting")
+
     return params
 
 
@@ -78,9 +81,6 @@ def run_merge(params):
     apply_absorption = not params.no_absorption
     apply_detector = not params.no_detector
     geometry = params.geometry
-
-    if split == "Friedel" and geometry is None:
-        raise Exception("--geometry argument is required for symmetry-based splitting")
 
     # load data into a giant table
     tabs = []
