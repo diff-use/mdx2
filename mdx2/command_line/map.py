@@ -34,10 +34,12 @@ def parse_arguments(args=None):
     params = parser.parse_args(args)
 
     # fix argparse ~bug where booleans are given as strings
-    if getattr(params, "symmetry") in ["True", "true", "T", "t"]:
+    if getattr(params, "symmetry") in ["True", "true", "T", "t", True, "1"]:
         setattr(params, "symmetry", True)
-    else:
+    elif getattr(params, "symmetry") in ["False", "false", "F", "f", False, "0"]:
         setattr(params, "symmetry", False)
+    else:
+        raise SystemExit("symmetry must be True or False")
 
     return params
 
