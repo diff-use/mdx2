@@ -285,6 +285,21 @@ def parse_arguments(args=None):
 
     params = parser.parse_args(args)
 
+    for param in [
+        "scaling_enable",
+        "offset_enable",
+        "detector_enable",
+        "absorption_enable",
+    ]:
+        if getattr(params, param) is None:
+            setattr(params, param, False)
+        elif getattr(params, param) in [True, "True", "true", "1", "T", "t"]:
+            setattr(params, param, True)
+        elif getattr(params, param) in [False, "False", "false", "0", "F", "f"]:
+            setattr(params, param, False)
+        else:
+            raise ValueError(f"Invalid value for {param}: {getattr(params, param)}. Must be True or False.")
+
     if params.mca2020:
         params.scaling_enable = True
         params.detector_enable = True
