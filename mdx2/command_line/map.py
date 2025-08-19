@@ -12,15 +12,12 @@ from mdx2.geometry import GridData
 from mdx2.utils import loadobj, saveobj
 
 
-def parse_arguments():
+def parse_arguments(args=None):
     """Parse commandline arguments"""
-
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-
-    # Required arguments
     parser.add_argument("geom", help="NeXus file with symmetry and crystal")
     parser.add_argument("hkl", help="NeXus file with hkl_table")
     parser.add_argument("--symmetry", default=True, metavar="TF", help="apply symmetry operators?")
@@ -34,25 +31,28 @@ def parse_arguments():
     )
     parser.add_argument("--signal", default="intensity", help="column in hkl_table to map")
     parser.add_argument("--outfile", default="map.nxs", help="name of the output NeXus file")
-
-    return parser
-
-
-def run(args=None):
-    parser = parse_arguments()
-    args = parser.parse_args(args)
+    params = parser.parse_args(args)
 
     # fix argparse ~bug where booleans are given as strings
-    for arg in ["symmetry"]:
-        if getattr(args, arg) in ["True", "true", "T", "t"]:
-            setattr(args, arg, True)
-        else:
-            setattr(args, arg, False)
+    if getattr(params, "symmetry") in ["True", "true", "T", "t"]:
+        setattr(params, "symmetry", True)
+    else:
+        setattr(params, "symmetry", False)
 
-    T = loadobj(args.hkl, "hkl_table")
-    Symmetry = loadobj(args.geom, "symmetry")  # used only if symmetry flag is set
-    signal = args.signal
-    hmin, hmax, kmin, kmax, lmin, lmax = args.limits
+    return params
+
+
+def run_map(params):
+    """Run the map script"""
+    hkl = params.hkl
+    geom = params.geom
+    outfile = params.outfile
+    apply_symmetry = params.symmetry
+    signal = params.signal
+    hmin, hmax, kmin, kmax, lmin, lmax = params.limits
+
+    T = loadobj(hkl, "hkl_table")
+    Symmetry = loadobj(geom, "symmetry")  # used only if symmetry flag is set
     ndiv = T.ndiv
 
     Hmin = np.round(hmin * ndiv[0]).astype(int)
@@ -76,11 +76,11 @@ def run(args=None):
 
     Tgrid = HKLTable(h.ravel(), k.ravel(), l.ravel(), ndiv=ndiv)
 
-    if args.symmetry:
+    if apply_symmetry:
         print("mapping Miller indices to asymmetric unit")
         Tgrid = Tgrid.to_asu(Symmetry)
 
-    print(f"looking up {args.signal} in data table")
+    print(f"looking up {signal} in data table")
     # lookup in the table
     df = T.to_frame().set_index(["h", "k", "l"])
     dfgrid = Tgrid.to_frame().set_index(["h", "k", "l"])
@@ -89,9 +89,15 @@ def run(args=None):
     print("preparing output array")
     data = dfgrid[signal].to_numpy().reshape(h.shape)
     G = GridData((h_axis, k_axis, l_axis), data, axes_names=["h", "k", "l"])
-    saveobj(G, args.outfile, name=signal, append=False)
+    saveobj(G, outfile, name=signal, append=False)
 
     print("done!")
+
+
+def run(args=None):
+    """Run the map script"""
+    params = parse_arguments(args=args)
+    run_map(params)
 
 
 if __name__ == "__main__":

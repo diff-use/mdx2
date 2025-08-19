@@ -9,15 +9,12 @@ import numpy as np
 from mdx2.utils import loadobj, saveobj
 
 
-def parse_arguments():
+def parse_arguments(args=None):
     """Parse commandline arguments"""
-
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-
-    # Required arguments
     parser.add_argument("geom", help="NeXus file with miller_index")
     parser.add_argument("hkl", help="NeXus file with hkl_table")
     parser.add_argument("--background", help="NeXus file with background map")
@@ -29,36 +26,45 @@ def parse_arguments():
         "--p1", action="store_true", help="map Miller indices to asymmetric unit for P1 (Friedel symmetry only)"
     )
     parser.add_argument("--outfile", default="corrected.nxs", help="name of the output NeXus file")
-
-    return parser
-
-
-def run(args=None):
-    parser = parse_arguments()
-    args = parser.parse_args(args)
+    params = parser.parse_args(args)
 
     # fix argparse ~bug where booleans are given as strings
-    for arg in ["attenuation", "efficiency", "polarization", "lorentz"]:
-        if getattr(args, arg) in ["True", "true", "T", "t"]:
-            setattr(args, arg, True)
+    for p in ["attenuation", "efficiency", "polarization", "lorentz"]:
+        if getattr(params, p) in ["True", "true", "T", "t"]:
+            setattr(params, p, True)
         else:
-            setattr(args, arg, False)
+            setattr(params, p, False)
 
-    T = loadobj(args.hkl, "hkl_table")
+    return params
+
+
+def run_correct(params):
+    """Run the correct script"""
+    hkl = params.hkl
+    geom = params.geom
+    background = params.background
+    outfile = params.outfile
+    p1 = params.p1
+    attenuation = params.attenuation
+    efficiency = params.efficiency
+    polarization = params.polarization
+    lorentz = params.lorentz
+
+    T = loadobj(hkl, "hkl_table")
 
     # hack to work with older versions
     if "_ndiv" in T.__dict__:
         T.ndiv = T._ndiv
         del T._ndiv
 
-    Corrections = loadobj(args.geom, "corrections")
-    Crystal = loadobj(args.geom, "crystal")
+    Corrections = loadobj(geom, "corrections")
+    Crystal = loadobj(geom, "crystal")
 
-    if args.p1:
+    if p1:
         print("ignoring space group information and using P1 symmetry only")
         Symmetry = None
     else:
-        Symmetry = loadobj(args.geom, "symmetry")
+        Symmetry = loadobj(geom, "symmetry")
 
     UB = Crystal.ub_matrix
 
@@ -78,18 +84,23 @@ def run(args=None):
     count_rate = T.counts / T.seconds
     count_rate_error = np.sqrt(T.counts) / T.seconds
 
-    if args.background is not None:
-        Bkg = loadobj(args.background, "binned_image_series")
+    if background is not None:
+        Bkg = loadobj(background, "binned_image_series")
         bkg_count_rate = Bkg.interpolate(T.phi, T.iy, T.ix)
         print("subtracting background from count rate")
         count_rate = count_rate - bkg_count_rate
 
     solid_angle = Cinterp["solid_angle"]
 
-    for corr in ["attenuation", "efficiency", "polarization"]:
-        if getattr(args, corr):
-            print("correcting solid angle for", corr)
-            solid_angle *= Cinterp[corr]
+    if attenuation:
+        print("correctin solid angle for attenuation")
+        solid_angle *= Cinterp["attenuation"]
+    if efficiency:
+        print("correcting solid angle for efficiency")
+        solid_angle *= Cinterp["efficiency"]
+    if polarization:
+        print("correcting solid angle for polarization")
+        solid_angle *= Cinterp["polarization"]
 
     print("computing the swept reciprocal space volume fraction (rs_volume)")
     T.rs_volume = T.pixels * Cinterp["d3s"] / np.linalg.det(UB)
@@ -98,7 +109,7 @@ def run(args=None):
     T.intensity = count_rate / solid_angle
     T.intensity_error = count_rate_error / solid_angle
 
-    if args.lorentz:
+    if lorentz:
         T.intensity *= T.rs_volume
         T.intensity_error *= T.rs_volume
 
@@ -121,9 +132,15 @@ def run(args=None):
     T.n = T.n.astype(np.int32)
     T.op = T.op.astype(np.int32)
 
-    saveobj(T, args.outfile, name="hkl_table", append=False)
+    saveobj(T, outfile, name="hkl_table", append=False)
 
     print("done!")
+
+
+def run(args=None):
+    """Run the correct script"""
+    params = parse_arguments(args=args)
+    run_correct(params)
 
 
 if __name__ == "__main__":

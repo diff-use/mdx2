@@ -8,15 +8,13 @@ import mdx2.geometry as geom
 from mdx2.utils import saveobj
 
 
-def parse_arguments():
-    """Parse commandline arguments"""
+def parse_arguments(args=None):
+    """Parse command line arguments for the import geometry script."""
 
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-
-    # Required arguments
     parser.add_argument("expt", help="dials experiments file, such as refined.expt")
     parser.add_argument(
         "--sample_spacing",
@@ -27,17 +25,16 @@ def parse_arguments():
         help="inverval between samples in degrees or pixels",
     )
     parser.add_argument("--outfile", default="geometry.nxs", help="name of the output NeXus file")
+    params = parser.parse_args(args)
+    return params
 
-    return parser
 
-
-def run(args=None):
-    parser = parse_arguments()
-    args = parser.parse_args(args)
-
-    exptfile = args.expt
-    spacing_phi_px = tuple(args.sample_spacing)
+def run_import_geometry(params):
+    """Run the import geometry script with the given parameters"""
+    exptfile = params.expt
+    spacing_phi_px = tuple(params.sample_spacing)
     spacing_px = spacing_phi_px[1:]
+    outfile = params.outfile
 
     print("Computing miller index lookup grid")
     miller_index = geom.MillerIndex.from_expt(
@@ -57,14 +54,20 @@ def run(args=None):
     print("Gathering unit cell info")
     crystal = geom.Crystal.from_expt(exptfile)
 
-    print(f"Saving geometry to {args.outfile}")
+    print(f"Saving geometry to {outfile}")
 
-    saveobj(crystal, args.outfile, name="crystal", append=False)
-    saveobj(symmetry, args.outfile, name="symmetry", append=True)
-    saveobj(corrections, args.outfile, name="corrections", append=True)
-    saveobj(miller_index, args.outfile, name="miller_index", append=True)
+    saveobj(crystal, outfile, name="crystal", append=False)
+    saveobj(symmetry, outfile, name="symmetry", append=True)
+    saveobj(corrections, outfile, name="corrections", append=True)
+    saveobj(miller_index, outfile, name="miller_index", append=True)
 
     print("done!")
+
+
+def run(args=None):
+    """Run the import geometry script"""
+    params = parse_arguments(args=args)
+    run_import_geometry(params)
 
 
 if __name__ == "__main__":

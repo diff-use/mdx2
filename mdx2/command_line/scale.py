@@ -12,7 +12,7 @@ from mdx2.scaling import BatchModelRefiner, ScaledData
 from mdx2.utils import loadobj, saveobj
 
 
-def parse_arguments():
+def parse_arguments(args=None):
     """Parse commandline arguments"""
 
     parser = argparse.ArgumentParser(
@@ -283,18 +283,13 @@ def parse_arguments():
         help="standard error cutoff for outlier rejection after refinement",
     )
 
-    return parser
+    params = parser.parse_args(args)
 
-
-def run(args=None):
-    parser = parse_arguments()
-    args = parser.parse_args(args)
-
-    if args.mca2020:
-        args.scaling_enable = True
-        args.detector_enable = True
-        args.absorption_enable = True
-        args.offset_enable = True
+    if params.mca2020:
+        params.scaling_enable = True
+        params.detector_enable = True
+        params.absorption_enable = True
+        params.offset_enable = True
 
     def generate_default_outfiles(infiles):
         dirs = [os.path.dirname(fn) for fn in infiles]
@@ -307,15 +302,55 @@ def run(args=None):
                 if len(set(postfix)) == len(postfix):  # postfixes are unique
                     return [os.path.join(dirs[0], f"scales_{pf}.nxs") for pf in postfix]
 
-    if args.outfile is None:
-        args.outfile = generate_default_outfiles(args.hkl)
-        if args.outfile is None:
+    if params.outfile is None:
+        params.outfile = generate_default_outfiles(params.hkl)
+        if params.outfile is None:
             raise ValueError("unable to auto-generate output file names from input name pattern")
+
+    return params
+
+
+def run_scale(params):
+    """Run the scale algorithm"""
+    hkl = params.hkl
+    outfile = params.outfile
+    scaling_enable = params.scaling_enable
+    offset_enable = params.offset_enable
+    absorption_enable = params.absorption_enable
+    detector_enable = params.detector_enable
+    scaling_alpha = params.scaling_alpha
+    scaling_dphi = params.scaling_dphi
+    scaling_niter = params.scaling_niter
+    scaling_x2tol = params.scaling_x2tol
+    scaling_outlier = params.scaling_outlier
+    offset_alpha_x = params.offset_alpha_x
+    offset_alpha_y = params.offset_alpha_y
+    offset_alpha_min = params.offset_alpha_min
+    offset_min = params.offset_min
+    offset_dphi = params.offset_dphi
+    offset_ns = params.offset_ns
+    offset_niter = params.offset_niter
+    offset_x2tol = params.offset_x2tol
+    offset_outlier = params.offset_outlier
+    detector_alpha = params.detector_alpha
+    detector_nx = params.detector_nx
+    detector_ny = params.detector_ny
+    detector_niter = params.detector_niter
+    detector_x2tol = params.detector_x2tol
+    detector_outlier = params.detector_outlier
+    absorption_alpha_xy = params.absorption_alpha_xy
+    absorption_alpha_z = params.absorption_alpha_z
+    absorption_nx = params.absorption_nx
+    absorption_ny = params.absorption_ny
+    absorption_dphi = params.absorption_dphi
+    absorption_niter = params.absorption_niter
+    absorption_x2tol = params.absorption_x2tol
+    absorption_outlier = params.absorption_outlier
 
     # load data into a giant table
     tabs = []
 
-    for n, fn in enumerate(args.hkl):
+    for n, fn in enumerate(hkl):
         tmp = loadobj(fn, "hkl_table")
         tmp.batch = n * np.ones_like(tmp.op)
         tabs.append(tmp)
@@ -338,25 +373,25 @@ def run(args=None):
 
     MR = BatchModelRefiner(S)
 
-    if args.scaling_enable:
+    if scaling_enable:
         MR.add_scaling_models(
-            dphi=args.scaling_dphi,
+            dphi=scaling_dphi,
         )
-    if args.offset_enable:
+    if offset_enable:
         MR.add_offset_models(
-            dphi=args.offset_dphi,
-            ns=args.offset_ns,
+            dphi=offset_dphi,
+            ns=offset_ns,
         )
-    if args.absorption_enable:
+    if absorption_enable:
         MR.add_absorption_models(
-            dphi=args.absorption_dphi,
-            nix=args.absorption_nx,
-            niy=args.absorption_ny,
+            dphi=absorption_dphi,
+            nix=absorption_nx,
+            niy=absorption_ny,
         )
-    if args.detector_enable:
+    if detector_enable:
         MR.add_detector_model(
-            nix=args.detector_nx,
-            niy=args.detector_ny,
+            nix=detector_nx,
+            niy=detector_ny,
         )
 
     print(f"applying scale factors")
@@ -366,112 +401,112 @@ def run(args=None):
 
     old_x2 = 1e6  # initialize to some large number
 
-    if args.scaling_enable:
+    if scaling_enable:
         print("optimizing scale vs. phi (b)")
-        for j in range(args.scaling_niter):
-            print(f"  iteration {j + 1} of {args.scaling_niter}")
+        for j in range(scaling_niter):
+            print(f"  iteration {j + 1} of {scaling_niter}")
             print(f"    fitting the model")
-            x2 = MR.bfit(Im, args.scaling_alpha)
+            x2 = MR.bfit(Im, scaling_alpha)
             print(f"    current x2: {x2}")
             print(f"    applying scale factors")
             MR.apply()
             print(f"    merging")
             Im, sigmam, counts = MR.data.merge()
-            if old_x2 - x2 < args.scaling_x2tol:
-                print(f"    change in x2 less than tolerance of {args.scaling_x2tol}, stopping")
+            if old_x2 - x2 < scaling_x2tol:
+                print(f"    change in x2 less than tolerance of {scaling_x2tol}, stopping")
                 break
             old_x2 = x2
-        nout = MR.data.mask_outliers(Im, args.scaling_outlier)
-        print(f"removed {nout} outliers > {args.scaling_outlier} sigma")
+        nout = MR.data.mask_outliers(Im, scaling_outlier)
+        print(f"removed {nout} outliers > {scaling_outlier} sigma")
 
-    if args.scaling_enable and args.offset_enable:
+    if scaling_enable and offset_enable:
         print("optimizing scale and offset vs. phi and resolution (b/c)")
-        for j in range(args.offset_niter):
-            print(f"  iteration {j + 1} of {args.offset_niter}")
+        for j in range(offset_niter):
+            print(f"  iteration {j + 1} of {offset_niter}")
             print(f"    fitting the model")
             MR.cfit(
                 Im,
-                args.offset_alpha_x,
-                args.offset_alpha_y,
-                args.offset_alpha_min,
-                args.offset_min,
+                offset_alpha_x,
+                offset_alpha_y,
+                offset_alpha_min,
+                offset_min,
             )  # 1,1,.1,min_c=0
-            x2 = MR.bfit(Im, args.scaling_alpha)
+            x2 = MR.bfit(Im, scaling_alpha)
             print(f"    current x2: {x2}")
             print(f"    applying scale factors")
             MR.apply()
             print(f"    merging")
             Im, sigmam, counts = MR.data.merge()
-            if old_x2 - x2 < args.offset_x2tol:
-                print(f"    change in x2 less than tolerance of {args.offset_x2tol}, stopping")
+            if old_x2 - x2 < offset_x2tol:
+                print(f"    change in x2 less than tolerance of {offset_x2tol}, stopping")
                 break
             old_x2 = x2
-        nout = MR.data.mask_outliers(Im, args.offset_outlier)
-        print(f"removed {nout} outliers > {args.offset_outlier} sigma")
+        nout = MR.data.mask_outliers(Im, offset_outlier)
+        print(f"removed {nout} outliers > {offset_outlier} sigma")
 
-    if args.offset_enable:
+    if offset_enable:
         print("optimizing offset vs. phi and resolution (c)")
-        for j in range(args.offset_niter):
-            print(f"  iteration {j + 1} of {args.offset_niter}")
+        for j in range(offset_niter):
+            print(f"  iteration {j + 1} of {offset_niter}")
             print(f"    fitting the model")
             x2 = MR.cfit(
                 Im,
-                args.offset_alpha_x,
-                args.offset_alpha_y,
-                args.offset_alpha_min,
-                args.offset_min,
+                offset_alpha_x,
+                offset_alpha_y,
+                offset_alpha_min,
+                offset_min,
             )  # 1,1,.1,min_c=0
             print(f"    current x2: {x2}")
             print(f"    applying scale factors")
             MR.apply()
             print(f"    merging")
             Im, sigmam, counts = MR.data.merge()
-            if old_x2 - x2 < args.offset_x2tol:
-                print(f"    change in x2 less than tolerance of {args.offset_x2tol}, stopping")
+            if old_x2 - x2 < offset_x2tol:
+                print(f"    change in x2 less than tolerance of {offset_x2tol}, stopping")
                 break
             old_x2 = x2
-        nout = MR.data.mask_outliers(Im, args.offset_outlier)
-        print(f"removed {nout} outliers > {args.offset_outlier} sigma")
+        nout = MR.data.mask_outliers(Im, offset_outlier)
+        print(f"removed {nout} outliers > {offset_outlier} sigma")
 
-    if args.detector_enable:
+    if detector_enable:
         print("optimizing scale vs. detector position (d)")
-        for j in range(args.detector_niter):
-            print(f"  iteration {j + 1} of {args.detector_niter}")
+        for j in range(detector_niter):
+            print(f"  iteration {j + 1} of {detector_niter}")
             print(f"    fitting the model")
-            x2 = MR.dfit(Im, args.detector_alpha)
+            x2 = MR.dfit(Im, detector_alpha)
             print(f"    current x2: {x2}")
             print(f"    applying scale factors")
             MR.apply()
             print(f"    merging")
             Im, sigmam, counts = MR.data.merge()
-            if old_x2 - x2 < args.detector_x2tol:
-                print(f"    change in x2 less than tolerance of {args.detector_x2tol}, stopping")
+            if old_x2 - x2 < detector_x2tol:
+                print(f"    change in x2 less than tolerance of {detector_x2tol}, stopping")
                 break
             old_x2 = x2
-        nout = MR.data.mask_outliers(Im, args.detector_outlier)
-        print(f"removed {nout} outliers > {args.detector_outlier} sigma")
+        nout = MR.data.mask_outliers(Im, detector_outlier)
+        print(f"removed {nout} outliers > {detector_outlier} sigma")
 
-    if args.absorption_enable:
+    if absorption_enable:
         print("optimizing scale vs. detector position and phi (a)")
-        for j in range(args.absorption_niter):
-            print(f"  iteration {j + 1} of {args.absorption_niter}")
+        for j in range(absorption_niter):
+            print(f"  iteration {j + 1} of {absorption_niter}")
             print(f"    fitting the model")
-            x2 = MR.afit(Im, args.absorption_alpha_xy, args.absorption_alpha_z)
+            x2 = MR.afit(Im, absorption_alpha_xy, absorption_alpha_z)
             print(f"    current x2: {x2}")
             print(f"    applying scale factors")
             MR.apply()
             print(f"    merging")
             Im, sigmam, counts = MR.data.merge()
-            if old_x2 - x2 < args.absorption_x2tol:
-                print(f"    change in x2 less than tolerance of {args.absorption_x2tol}, stopping")
+            if old_x2 - x2 < absorption_x2tol:
+                print(f"    change in x2 less than tolerance of {absorption_x2tol}, stopping")
                 break
             old_x2 = x2
-        nout = MR.data.mask_outliers(Im, args.absorption_outlier)
-        print(f"removed {nout} outliers > {args.absorption_outlier} sigma")
+        nout = MR.data.mask_outliers(Im, absorption_outlier)
+        print(f"removed {nout} outliers > {absorption_outlier} sigma")
 
     print("finished refining")
 
-    for model_refiner, fn in zip(MR._batch_refiners, args.outfile):
+    for model_refiner, fn in zip(MR._batch_refiners, outfile):
         models = dict(
             scaling_model=model_refiner.scaling.model,
             detector_model=model_refiner.detector.model,
@@ -486,6 +521,12 @@ def run(args=None):
                 file_created = True
 
     print("done!")
+
+
+def run(args=None):
+    """Run the scale script"""
+    params = parse_arguments(args=args)
+    run_scale(params)
 
 
 if __name__ == "__main__":
