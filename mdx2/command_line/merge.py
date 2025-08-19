@@ -12,7 +12,7 @@ from mdx2.scaling import BatchModelRefiner, ScaledData
 from mdx2.utils import loadobj, saveobj
 
 
-def parse_arguments():
+def parse_arguments(args=None):
     """Parse commandline arguments"""
 
     parser = argparse.ArgumentParser(
@@ -40,7 +40,9 @@ def parse_arguments():
     parser.add_argument("--no-absorption", action="store_true", help="do not apply absorption model")
     parser.add_argument("--no-detector", action="store_true", help="do not apply detector model")
 
-    return parser
+    params = parser.parse_args(args)
+
+    return params
 
 
 def wrs(index_map, w):
@@ -64,14 +66,26 @@ def wrs(index_map, w):
     return isgrp1
 
 
-def run(args=None):
-    parser = parse_arguments()
-    args = parser.parse_args(args)
+def run_merge(params):
+    """Run the merge script"""
+    hkl = params.hkl
+    scale = params.scale
+    outfile = params.outfile
+    outlier = params.outlier
+    split = params.split
+    apply_scaling = not params.no_scaling
+    apply_offset = not params.no_offset
+    apply_absorption = not params.no_absorption
+    apply_detector = not params.no_detector
+    geometry = params.geometry
+
+    if split == "Friedel" and geometry is None:
+        raise Exception("--geometry argument is required for symmetry-based splitting")
 
     # load data into a giant table
     tabs = []
 
-    for n, fn in enumerate(args.hkl):
+    for n, fn in enumerate(hkl):
         tmp = loadobj(fn, "hkl_table")
         tmp.batch = n * np.ones_like(tmp.op)
         tabs.append(tmp)
@@ -94,16 +108,16 @@ def run(args=None):
 
     MR = BatchModelRefiner(S)
 
-    if args.scale is not None:
-        for fn, refiner in zip(args.scale, MR._batch_refiners):
+    if scale is not None:
+        for fn, refiner in zip(scale, MR._batch_refiners):
             a = nxload(fn)
-            if not args.no_absorption and ("absorption_model" in a.entry.keys()):
+            if apply_absorption and ("absorption_model" in a.entry.keys()):
                 refiner.absorption.model = loadobj(fn, "absorption_model")
-            if not args.no_offset and ("offset_model" in a.entry.keys()):
+            if apply_offset and ("offset_model" in a.entry.keys()):
                 refiner.offset.model = loadobj(fn, "offset_model")
-            if not args.no_detector and ("detector_model" in a.entry.keys()):
+            if apply_detector and ("detector_model" in a.entry.keys()):
                 refiner.detector.model = loadobj(fn, "detector_model")
-            if not args.no_scaling and ("scaling_model" in a.entry.keys()):
+            if apply_scaling and ("scaling_model" in a.entry.keys()):
                 refiner.scaling.model = loadobj(fn, "scaling_model")
 
     print("applying scale factors")
@@ -111,9 +125,9 @@ def run(args=None):
     print("merging")
     Im, sigmam, counts = MR.data.merge()
 
-    if args.outlier is not None:
-        nout = MR.data.mask_outliers(Im, args.outlier)
-        print(f"removed {nout} outliers > {args.outlier} sigma")
+    if outlier is not None:
+        nout = MR.data.mask_outliers(Im, outlier)
+        print(f"removed {nout} outliers > {outlier} sigma")
         print("merging again")
         Im, sigmam, counts = MR.data.merge()
 
@@ -123,26 +137,24 @@ def run(args=None):
         count=counts.astype(np.int32),
     )
 
-    if args.split is not None:
-        if args.split == "weightedRandomHalf":
+    if split is not None:
+        if split == "weightedRandomHalf":
             print("Splitting according to the weighted random half algorithm")
             w = 1 / MR.data.sigma**2
             isgrp1 = wrs(index_map, w.filled(fill_value=0))
             groups = [isgrp1, ~isgrp1]
-        elif args.split == "randomHalf":
+        elif split == "randomHalf":
             print("Splitting into random half-datasets (unweighted)")
             isgrp1 = wrs(index_map, np.ones_like(index_map))
             groups = [isgrp1, ~isgrp1]
-        elif args.split == "Friedel":
+        elif split == "Friedel":
             print("Splitting into Friedel pairs")
-            if args.geometry is None:
-                raise ("--geometry argument is required for symmetry-based splitting")
-            symm = loadobj(args.geometry, "symmetry")
+            symm = loadobj(geometry, "symmetry")
             has_inversion = np.array([np.linalg.det(op) for op in symm.laue_group_operators]) < 0
             isminus = has_inversion[hkl.op]
             groups = [~isminus, isminus]
         else:
-            raise ("something bad happened")
+            raise Exception("something bad happened")
         for j, g in enumerate(groups):
             G = MR.data.copy()
             G.mask = G.mask | ~g
@@ -180,9 +192,15 @@ def run(args=None):
     # hkl_table = HKLTable.from_frame(df_merged)
     # hkl_table.ndiv = ndiv # lost in conversion to/from dataframe
 
-    saveobj(hkl_table, args.outfile, name="hkl_table", append=False)
+    saveobj(hkl_table, outfile, name="hkl_table", append=False)
 
     print("done!")
+
+
+def run(args=None):
+    """Run the merge script"""
+    params = parse_arguments(args=args)
+    run_merge(params)
 
 
 if __name__ == "__main__":
