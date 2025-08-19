@@ -30,10 +30,12 @@ def parse_arguments(args=None):
 
     # fix argparse ~bug where booleans are given as strings
     for p in ["attenuation", "efficiency", "polarization", "lorentz"]:
-        if getattr(params, p) in ["True", "true", "T", "t"]:
+        if getattr(params, p) in ["True", "true", "T", "t", True, "1"]:
             setattr(params, p, True)
-        else:
+        elif getattr(params, p) in ["False", "false", "F", "f", False, "0"]:
             setattr(params, p, False)
+        else:
+            raise SystemExit(f"{p} must be True or False")
 
     return params
 
