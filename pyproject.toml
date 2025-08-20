@@ -19,6 +19,7 @@ dependencies = [
     "nexusformat",
     "joblib",
     "numexpr",
+    "simple-parsing",
 ]
 # dxtbx needs to be installed with conda
 
