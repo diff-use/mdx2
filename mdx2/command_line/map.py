@@ -2,46 +2,40 @@
 Create a map from data in an hkl table
 """
 
-import argparse
+from dataclasses import dataclass
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
+from simple_parsing import ArgumentParser, field
 
 from mdx2.data import HKLTable
 from mdx2.geometry import GridData
 from mdx2.utils import loadobj, saveobj
 
 
+@dataclass
+class Parameters:
+    """Options for creating an array from an hkl table"""
+
+    geom: str = field(positional=True)  # NeXus file containing symmetry and crystal
+    hkl: str = field(positional=True)  # NeXus file containing hkl_table
+    symmetry: bool = True  # apply symmetry operators
+    limits: Tuple[float, float, float, float, float, float] = (0, 10, 0, 10, 0, 10)
+    """limits for the hkl grid (hmin, hmax, kmin, kmax, lmin, lmax)"""
+    signal: str = "intensity"  # column in hkl_table to map
+    outfile: str = "map.nxs"  # name of the output NeXus file
+
+
+# NOTE: should perhaps change so that limits is a required argument
+
+
 def parse_arguments(args=None):
     """Parse commandline arguments"""
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument("geom", help="NeXus file with symmetry and crystal")
-    parser.add_argument("hkl", help="NeXus file with hkl_table")
-    parser.add_argument("--symmetry", default=True, metavar="TF", help="apply symmetry operators?")
-    parser.add_argument(
-        "--limits",
-        default=[0, 10, 0, 10, 0, 10],
-        type=float,
-        nargs=6,
-        metavar=("H1", "H2", "K1", "K2", "L1", "L2"),
-        help="region to map",
-    )
-    parser.add_argument("--signal", default="intensity", help="column in hkl_table to map")
-    parser.add_argument("--outfile", default="map.nxs", help="name of the output NeXus file")
-    params = parser.parse_args(args)
-
-    # fix argparse ~bug where booleans are given as strings
-    if getattr(params, "symmetry") in ["True", "true", "T", "t", True, "1"]:
-        setattr(params, "symmetry", True)
-    elif getattr(params, "symmetry") in ["False", "false", "F", "f", False, "0"]:
-        setattr(params, "symmetry", False)
-    else:
-        raise SystemExit("symmetry must be True or False")
-
-    return params
+    parser = ArgumentParser(description=__doc__)
+    parser.add_arguments(Parameters, dest="parameters")
+    opts = parser.parse_args(args)
+    return opts.parameters
 
 
 def run_map(params):

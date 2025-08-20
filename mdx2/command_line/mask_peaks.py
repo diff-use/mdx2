@@ -2,37 +2,35 @@
 Create a peak mask for in an image stack
 """
 
-import argparse
+from dataclasses import dataclass
 
 import numpy as np
 from joblib import Parallel, delayed
+from simple_parsing import ArgumentParser, field  # pip install simple-parsing
 
 from mdx2.geometry import GridData
 from mdx2.utils import loadobj, saveobj
 
 
+@dataclass
+class Parameters:
+    """Options for creating a peak mask"""
+
+    geom: str = field(positional=True)  # NeXus data file containing miller_index
+    data: str = field(positional=True)  # NeXus data file containing image_series
+    peaks: str = field(positional=True)  # NeXus data file containing peak_model and peaks
+    sigma_cutoff: float = 3.0  # contour level for drawing the peak mask
+    outfile: str = "mask.nxs"  # name of the output NeXus file
+    nproc: int = 1  # number of parallel processes
+    bragg: bool = False  # create a Bragg peak mask instead
+
+
 def parse_arguments(args=None):
     """Parse commandline arguments"""
-
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-
-    # Required arguments
-    parser.add_argument("geom", help="NeXus file w/ miller_index")
-    parser.add_argument("data", help="NeXus file w/ image_series")
-    parser.add_argument("peaks", help="NeXus file w/ peak_model and peaks")
-    parser.add_argument(
-        "--sigma_cutoff", metavar="SIGMA", default=3, type=float, help="sigma value to draw the peak mask"
-    )
-    parser.add_argument("--outfile", default="mask.nxs", help="name of the output NeXus file")
-    parser.add_argument("--nproc", type=int, default=1, metavar="N", help="number of parallel processes")
-    parser.add_argument("--bragg", action="store_true", help="create a Bragg peak mask instead")
-
-    params = parser.parse_args(args)
-
-    return params
+    parser = ArgumentParser(description=__doc__)
+    parser.add_arguments(Parameters, dest="parameters")
+    opts = parser.parse_args(args)
+    return opts.parameters
 
 
 def run_mask_peaks(params):

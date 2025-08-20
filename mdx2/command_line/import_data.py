@@ -2,25 +2,31 @@
 Import x-ray image data using the dxtbx machinery
 """
 
-import argparse
+from dataclasses import dataclass
+
+from simple_parsing import ArgumentParser, field
 
 from mdx2.data import ImageSeries
 from mdx2.dxtbx_machinery import ImageSet
 from mdx2.utils import saveobj
 
 
+@dataclass
+class Parameters:
+    """Options for importing x-ray image data"""
+
+    expt: str = field(positional=True)  # experiments file, such as from dials.import
+    chunks: tuple[int, int, int]  # chunking for compression (frames, y, x)
+    outfile: str = "data.nxs"  # name of the output NeXus file
+    nproc: int = 1  # number of parallel processes
+
+
 def parse_arguments(args=None):
     """Parse commandline arguments"""
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument("expt", help="experiments file, such as from dials.import")
-    parser.add_argument("--outfile", default="data.nxs", help="name of the output NeXus file")
-    parser.add_argument("--chunks", nargs=3, type=int, metavar="N", help="chunking for compression (frames, y, x)")
-    parser.add_argument("--nproc", type=int, default=1, metavar="N", help="number of parallel processes")
-    params = parser.parse_args(args)
-    return params
+    parser = ArgumentParser(description=__doc__)
+    parser.add_arguments(Parameters, dest="parameters")
+    opts = parser.parse_args(args)
+    return opts.parameters
 
 
 def run_import_data(params):

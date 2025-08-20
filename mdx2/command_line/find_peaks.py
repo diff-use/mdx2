@@ -2,37 +2,34 @@
 Find and analyze peaks in an image stack
 """
 
-import argparse
+from dataclasses import dataclass
 
 import numpy as np
+from simple_parsing import ArgumentParser, field  # pip install simple-parsing
 
 from mdx2.data import Peaks
 from mdx2.geometry import GaussianPeak
 from mdx2.utils import loadobj, saveobj
 
 
+@dataclass
+class Parameters:
+    """Options for finding peaks in an image stack"""
+
+    geom: str = field(positional=True)  # NeXus data file containing miller_index
+    data: str = field(positional=True)  # NeXus data file containing image_series
+    count_threshold: float  # pixels with counts above threshold are flagged as peaks
+    sigma_cutoff: float = 3.0  # for outlier rejection in Gaussian peak fitting
+    outfile: str = "peaks.nxs"  # name of the output NeXus file
+    nproc: int = 1  # number of parallel processes
+
+
 def parse_arguments(args=None):
     """Parse commandline arguments"""
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument("geom", help="NeXus file w/ miller_index")
-    parser.add_argument("data", help="NeXus file w/ image_series")
-    parser.add_argument(
-        "--count_threshold",
-        metavar="THRESH",
-        required=True,
-        type=float,
-        help="pixels with counts above threshold are flagged as peaks",
-    )
-    parser.add_argument(
-        "--sigma_cutoff", metavar="SIGMA", default=3, type=float, help="\for outlier rejection in Gaussian peak fitting"
-    )
-    parser.add_argument("--outfile", default="peaks.nxs", help="name of the output NeXus file")
-    parser.add_argument("--nproc", type=int, default=1, metavar="N", help="number of parallel processes")
-    params = parser.parse_args(args)
-    return params
+    parser = ArgumentParser(description=__doc__)
+    parser.add_arguments(Parameters, dest="parameters")
+    opts = parser.parse_args(args)
+    return opts.parameters
 
 
 def run_find_peaks(params):
