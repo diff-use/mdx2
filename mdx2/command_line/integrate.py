@@ -2,10 +2,12 @@
 Integrate counts in an image stack on a Miller index grid
 """
 
-import argparse
+from dataclasses import dataclass
+from typing import Optional, Tuple
 
 import numpy as np
 from joblib import Parallel, delayed
+from simple_parsing import ArgumentParser, field
 
 from mdx2.data import HKLTable
 from mdx2.utils import (
@@ -15,32 +17,25 @@ from mdx2.utils import (
 )
 
 
+@dataclass
+class Parameters:
+    """Options for integrating counts on a Miller index grid"""
+
+    geom: str = field(positional=True)  # NeXus data file containing miller_index
+    data: str = field(positional=True)  # NeXus data file containing image_series
+    mask: Optional[str]  # NeXus data file containing mask
+    subdivide: Tuple[int, int, int] = (1, 1, 1)  # subdivisions of the Miller index grid
+    max_spread: float = 1.0  # maximum angular spread (degrees) for binning partial observations
+    nproc: int = 1  # number of parallel processes
+    outfile: str = "integrated.nxs"  # name of the output NeXus file
+
+
 def parse_arguments(args=None):
     """Parse commandline arguments"""
-
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-
-    # Required arguments
-    parser.add_argument("geom", help="NeXus file with miller_index")
-    parser.add_argument("data", help="NeXus file with image_series")
-    parser.add_argument("--mask", help="NeXus file with mask")
-    parser.add_argument(
-        "--subdivide", nargs=3, metavar="N", type=int, default=[1, 1, 1], help="subdivisions of the Miller index grid"
-    )
-    parser.add_argument(
-        "--max_spread",
-        type=float,
-        default=1.0,
-        metavar="DEGREES",
-        help="maximum angular spread for binning partial observations",
-    )
-    parser.add_argument("--outfile", default="integrated.nxs", help="name of the output NeXus file")
-    parser.add_argument("--nproc", type=int, default=1, metavar="N", help="number of parallel processes")
-    params = parser.parse_args(args)
-    return params
+    parser = ArgumentParser(description=__doc__)
+    parser.add_arguments(Parameters, dest="parameters")
+    opts = parser.parse_args(args)
+    return opts.parameters
 
 
 def run_integrate(params):

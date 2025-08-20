@@ -2,42 +2,36 @@
 Apply corrections to integrated data
 """
 
-import argparse
+from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
+from simple_parsing import ArgumentParser, field  # pip install simple-parsing
 
 from mdx2.utils import loadobj, saveobj
 
 
+@dataclass
+class Parameters:
+    """Options for applying corrections to integrated data"""
+
+    geom: str = field(positional=True)  # NeXus data file containing miller_index
+    hkl: str = field(positional=True)  # NeXus data file containing hkl_table
+    background: Optional[str]  # NeXus file with background map
+    attenuation: bool = True  # apply attenuation correction
+    efficiency: bool = True  # apply efficiency correction
+    polarization: bool = True  # apply polarization correction
+    lorentz: bool = False  # apply Lorentz correction
+    p1: bool = False  # map Miller indices to asymmetric unit for P1 (Friedel symmetry only)
+    outfile: str = "corrected.nxs"  # name of the output NeXus file
+
+
 def parse_arguments(args=None):
     """Parse commandline arguments"""
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument("geom", help="NeXus file with miller_index")
-    parser.add_argument("hkl", help="NeXus file with hkl_table")
-    parser.add_argument("--background", help="NeXus file with background map")
-    parser.add_argument("--attenuation", metavar="TF", default=True, help="apply attenuation correction?")
-    parser.add_argument("--efficiency", metavar="TF", default=True, help="apply efficiency correction?")
-    parser.add_argument("--polarization", metavar="TF", default=True, help="apply polarization correction?")
-    parser.add_argument("--lorentz", metavar="TF", default=False, help="apply Lorentz correction?")
-    parser.add_argument(
-        "--p1", action="store_true", help="map Miller indices to asymmetric unit for P1 (Friedel symmetry only)"
-    )
-    parser.add_argument("--outfile", default="corrected.nxs", help="name of the output NeXus file")
-    params = parser.parse_args(args)
-
-    # fix argparse ~bug where booleans are given as strings
-    for p in ["attenuation", "efficiency", "polarization", "lorentz"]:
-        if getattr(params, p) in ["True", "true", "T", "t", True, "1"]:
-            setattr(params, p, True)
-        elif getattr(params, p) in ["False", "false", "F", "f", False, "0"]:
-            setattr(params, p, False)
-        else:
-            raise SystemExit(f"{p} must be True or False")
-
-    return params
+    parser = ArgumentParser(description=__doc__)
+    parser.add_arguments(Parameters, dest="parameters")
+    opts = parser.parse_args(args)
+    return opts.parameters
 
 
 def run_correct(params):

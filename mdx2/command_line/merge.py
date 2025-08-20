@@ -2,50 +2,47 @@
 Merge corrected intensities using a scaling model
 """
 
-import argparse
+from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 from nexusformat.nexus import nxload
+from simple_parsing import ArgumentParser, field  # pip install simple-parsing
 
 from mdx2.data import HKLTable
 from mdx2.scaling import BatchModelRefiner, ScaledData
 from mdx2.utils import loadobj, saveobj
 
 
+@dataclass
+class Parameters:
+    """Options for merging scaled intensities"""
+
+    hkl: str = field(positional=True, nargs="+")  # NeXus file(s) containing hkl_table
+    scale: str = field(nargs="+")  # NeXus file(s) with scaling models
+    outlier: Optional[float]  # optional standard error cutoff for outlier rejection
+    split: Optional[str] = field(choices=["randomHalf", "weightedRandomHalf", "Friedel"])
+    """also merge data into separate columns based on splitting criteria"""
+    geometry: Optional[str]  # NeXus file containing the Laue group symmetry operators, required for --split Friedel
+    outfile: str = "merged.nxs"  # name of the output NeXus file
+    scaling: bool = field(default=True, negative_prefix="--no-")  # apply scaling model if present
+    offset: bool = field(default=True, negative_prefix="--no-")  # apply offset model if present
+    absorption: bool = field(default=True, negative_prefix="--no-")  # apply absorption model if present
+    detector: bool = field(default=True, negative_prefix="--no-")  # apply detector model if present
+
+
+# note: negative_prefix is used to allow --no-scaling, --no-offset, etc. for consistency with old argparse api
+# future: could switch split to an Enum type, to simplify selection of choices by alternate APIs
+
+
 def parse_arguments(args=None):
     """Parse commandline arguments"""
-
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-
-    # Required arguments
-    parser.add_argument("hkl", nargs="+", help="NeXus file(s) with hkl_table")
-    parser.add_argument("--scale", nargs="+", help="NeXus file(s) with scaling models")
-    parser.add_argument("--outfile", default="merged.nxs", help="name of the output NeXus file")
-    parser.add_argument(
-        "--outlier", type=float, metavar="NSIGMA", help="optional standard error cutoff for outlier rejection"
-    )
-    parser.add_argument(
-        "--split",
-        choices=["randomHalf", "weightedRandomHalf", "Friedel"],  # TODO: batch, Laue, Friedel, etc
-        help="also merge data into separate columns based on splitting criteria",
-    )
-    parser.add_argument(
-        "--geometry", help="NeXus file containing the Laue group symmetry operators, required if --split is 'Friedel'"
-    )
-    parser.add_argument("--no-scaling", action="store_true", help="do not apply scaling model")
-    parser.add_argument("--no-offset", action="store_true", help="do not apply offset model")
-    parser.add_argument("--no-absorption", action="store_true", help="do not apply absorption model")
-    parser.add_argument("--no-detector", action="store_true", help="do not apply detector model")
-
-    params = parser.parse_args(args)
-
-    if params.split == "Friedel" and params.geometry is None:
+    parser = ArgumentParser(description=__doc__)
+    parser.add_arguments(Parameters, dest="parameters")
+    opts = parser.parse_args(args)
+    if opts.parameters.split == "Friedel" and opts.parameters.geometry is None:
         raise SystemExit("--geometry argument is required for symmetry-based splitting")
-
-    return params
+    return opts.parameters
 
 
 def wrs(index_map, w):
@@ -76,10 +73,10 @@ def run_merge(params):
     outfile = params.outfile
     outlier = params.outlier
     split = params.split
-    apply_scaling = not params.no_scaling
-    apply_offset = not params.no_offset
-    apply_absorption = not params.no_absorption
-    apply_detector = not params.no_detector
+    apply_scaling = params.scaling
+    apply_offset = params.offset
+    apply_absorption = params.absorption
+    apply_detector = params.detector
     geometry = params.geometry
 
     # load data into a giant table
