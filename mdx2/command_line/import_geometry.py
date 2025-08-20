@@ -2,31 +2,29 @@
 Import experimental geometry using the dxtbx machinery
 """
 
-import argparse
+from dataclasses import dataclass
+
+from simple_parsing import ArgumentParser, field
 
 import mdx2.geometry as geom
 from mdx2.utils import saveobj
 
 
-def parse_arguments(args=None):
-    """Parse command line arguments for the import geometry script."""
+@dataclass
+class Parameters:
+    """Options for importing experimental geometry"""
 
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument("expt", help="dials experiments file, such as refined.expt")
-    parser.add_argument(
-        "--sample_spacing",
-        nargs=3,
-        metavar=("PHI", "IY", "IX"),
-        type=int,
-        default=[1, 10, 10],
-        help="inverval between samples in degrees or pixels",
-    )
-    parser.add_argument("--outfile", default="geometry.nxs", help="name of the output NeXus file")
-    params = parser.parse_args(args)
-    return params
+    expt: str = field(positional=True)  # dials experiments file, such as refined.expt
+    sample_spacing: tuple[int, int, int] = (1, 10, 10)  # inverval in degrees or pixels (phi, iy, ix)
+    outfile: str = "geometry.nxs"  # name of the output NeXus file
+
+
+def parse_arguments(args=None):
+    """Parse commandline arguments"""
+    parser = ArgumentParser(description=__doc__)
+    parser.add_arguments(Parameters, dest="parameters")
+    opts = parser.parse_args(args)
+    return opts.parameters
 
 
 def run_import_geometry(params):

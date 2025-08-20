@@ -2,365 +2,170 @@
 Fit scaling model to unmerged corrected intensities
 """
 
-import argparse
 import os
+from dataclasses import dataclass
 
 import numpy as np
+from simple_parsing import ArgumentGenerationMode, ArgumentParser, NestedMode, field
 
 from mdx2.data import HKLTable
 from mdx2.scaling import BatchModelRefiner, ScaledData
 from mdx2.utils import loadobj, saveobj
 
 
+@dataclass
+class ScalingModelParameters:
+    """Options to control refinement of the scaling model"""
+
+    enable: bool = True  # include smooth scale factor vs. phi
+    alpha: float = 1.0  # amount to rescale the default smoothness (regularization parameter)
+    dphi: float = 1.0  # spacing of phi control points in degrees
+    niter: int = 10  # maximum iterations in refinement
+    x2tol: float = 1.0e-4  # maximum change in x2 to stop refinement early
+    outlier: float = 10.0  # standard error cutoff for outlier rejection after refinement
+
+
+@dataclass
+class OffsetModelParameters:
+    """Options to control refinement of the offset model"""
+
+    enable: bool = False  # include smooth offset vs. resolution and phi
+    alpha_x: float = 1.0  # smoothness vs. s (resolution), multiplies the regularization parameter
+    alpha_y: float = 1.0  # smoothness vs. phi, multiplies the regularization parameter
+    alpha_min: float = 0.001  # deviation from offset.min, multiplies the regularization parameter
+    min: float = 0.0  # minimum value of offset
+    dphi: float = 2.5  # spacing of phi control points in degrees
+    ns: int = 31  # number of s (resolution) control points
+    niter: int = 5  # maximum iterations in refinement
+    x2tol: float = 1.0e-3  # maximum change in x2 to stop refinement early
+    outlier: float = 5.0  # standard error cutoff for outlier rejection after refinement
+
+
+@dataclass
+class DetectorModelParameters:
+    """Options to control refinement of the detector model"""
+
+    enable: bool = False  # include smooth scale vs. detector xy position
+    alpha: float = 1.0  # smoothness vs. xy position: multiplies the regularization parameter
+    nx: int = 200  # number of grid control points in the x direction
+    ny: int = 200  # number of grid control points in the y direction
+    niter: int = 5  # maximum iterations in refinement
+    x2tol: float = 1.0e-3  # maximum change in x2 to stop refinement early
+    outlier: float = 5.0  # standard error cutoff for outlier rejection after refinement
+
+
+@dataclass
+class AbsorptionModelParameters:
+    """Options to control refinement of the absorption model"""
+
+    enable: bool = True  # include smooth scale vs. detector xy position and phi
+    alpha_xy: float = 10.0  # smoothness vs. xy position: multiplies the regularization parameter
+    alpha_z: float = 1.0  # smoothness vs. phi: multiplies the regularization parameter
+    nx: int = 20  # number of grid control points in the x direction
+    ny: int = 20  # number of grid control points in the y direction
+    dphi: float = 5.0  # spacing of phi control points in degrees
+    niter: int = 5  # maximum iterations in refinement
+    x2tol: float = 1.0e-4  # maximum change in x2 to stop refinement early
+    outlier: float = 5.0  # standard error cutoff for outlier rejection after refinement
+
+
+@dataclass
+class Parameters:
+    """Options for refining a scaling model to unmerged corrected intensities"""
+
+    hkl: str = field(positional=True, nargs="+")  # NeXus file(s) containing hkl_table
+    scaling: ScalingModelParameters
+    absorption: AbsorptionModelParameters
+    detector: DetectorModelParameters
+    offset: OffsetModelParameters
+    outfile: str = field(nargs="*")
+    """name of the output NeXus file(s). If omitted, will attempt a sensible name such as scales.nxs"""
+    mca2020: bool = False
+    """shortcut for --scaling.enable True --offset.enable True --detector.enable True --absorption.enable True"""
+
+
+def generate_default_outfiles(infiles):
+    """Generate default output file names based on input file names.
+
+    - If the input files are in different directories, returns a list of scales.nxs in each directory.
+    - If the input files are in the same directory, returns a single scales.nxs file with a unique postfix
+    based on the input file names.
+    - If the input files have a common pattern, returns a list of scales_<postfix>.nxs
+    where <postfix> is derived from the input file names.
+    - If the input files do not match any of these criteria, returns None.
+    """
+    dirs = [os.path.dirname(fn) for fn in infiles]
+    if len(set(dirs)) == len(dirs):  # dirs are unique
+        return [os.path.join(d, "scales.nxs") for d in dirs]
+    if len(set(dirs)) == 1:  # dirs are identical
+        roots = [os.path.splitext(os.path.split(fn)[-1])[0] for fn in infiles]
+        if all(["_" in root for root in roots]):
+            postfix = [root.split("_")[-1] for root in roots]
+            if len(set(postfix)) == len(postfix):  # postfixes are unique
+                return [os.path.join(dirs[0], f"scales_{pf}.nxs") for pf in postfix]
+    return None
+
+
 def parse_arguments(args=None):
     """Parse commandline arguments"""
-
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description=__doc__,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        argument_generation_mode=ArgumentGenerationMode.NESTED,
+        nested_mode=NestedMode.WITHOUT_ROOT,
     )
+    parser.add_arguments(Parameters, dest="parameters")
+    opts = parser.parse_args(args)
 
-    parser.add_argument("hkl", nargs="+", help="NeXus file(s) with hkl_table")
-    parser.add_argument(
-        "--mca2020",
-        action="store_true",
-        help="shortcut for --scaling.enable True --offset.enable True --detector.enable True --absorption.enable True",
-    )
-    parser.add_argument(
-        "--outfile",
-        nargs="+",
-        help="name of the output NeXus file(s). "
-        "If not specified, will attempt a sensible name such as scales.nxs for a single input file",
-    )
+    if opts.parameters.mca2020:
+        opts.parameters.scaling.enable = True
+        opts.parameters.detector.enable = True
+        opts.parameters.absorption.enable = True
+        opts.parameters.offset.enable = True
 
-    scaling_group = parser.add_argument_group(title="Scaling parameters")
-    scaling_group.add_argument(
-        "--scaling.enable",
-        dest="scaling_enable",
-        default=True,
-        metavar="TF",
-        help="include smooth scale factor vs. phi",
-    )
-    scaling_group.add_argument(
-        "--scaling.alpha",
-        dest="scaling_alpha",
-        default=1.0,
-        type=float,
-        metavar="ALPHA",
-        help="amount to rescale the default smoothness (regularization parameter)",
-    )
-    scaling_group.add_argument(
-        "--scaling.dphi",
-        dest="scaling_dphi",
-        default=1.0,
-        type=float,
-        metavar="DEGREES",
-        help="spacing of phi control points in degrees",
-    )
-    scaling_group.add_argument(
-        "--scaling.niter",
-        dest="scaling_niter",
-        default=10,
-        type=int,
-        metavar="N",
-        help="maximum iterations in refinement",
-    )
-    scaling_group.add_argument(
-        "--scaling.x2tol",
-        dest="scaling_x2tol",
-        default=1e-4,
-        type=float,
-        metavar="TOL",
-        help="maximum change in x2 to stop refinement early",
-    )
-    scaling_group.add_argument(
-        "--scaling.outlier",
-        dest="scaling_outlier",
-        default=10,
-        type=float,
-        metavar="NSIGMA",
-        help="standard error cutoff for outlier rejection after refinement",
-    )
-
-    offset_group = parser.add_argument_group(title="Offset parameters")
-    offset_group.add_argument(
-        "--offset.enable",
-        dest="offset_enable",
-        default=False,
-        metavar="TF",
-        help="include smooth offset vs. resolution and phi",
-    )
-    offset_group.add_argument(
-        "--offset.alpha_x",
-        dest="offset_alpha_x",
-        default=1.0,
-        type=float,
-        metavar="ALPHA",
-        help="smoothness vs. s (resolution): multiplies the regularization parameter",
-    )
-    offset_group.add_argument(
-        "--offset.alpha_y",
-        dest="offset_alpha_y",
-        default=1.0,
-        type=float,
-        metavar="ALPHA",
-        help="smoothness vs. phi -- multiplies the regularization parameter",
-    )
-    offset_group.add_argument(
-        "--offset.alpha_min",
-        dest="offset_alpha_min",
-        default=0.001,
-        type=float,
-        metavar="ALPHA",
-        help="deviation from offset.min: multiplies the regularization parameter",
-    )
-    offset_group.add_argument(
-        "--offset.min", dest="offset_min", default=0.0, type=float, metavar="VAL", help="minimum value of offset"
-    )
-    offset_group.add_argument(
-        "--offset.dphi",
-        dest="offset_dphi",
-        default=2.5,
-        type=float,
-        metavar="DEGREES",
-        help="spacing of phi control points in degrees",
-    )
-    offset_group.add_argument(
-        "--offset.ns",
-        dest="offset_ns",
-        default=31,
-        type=int,
-        metavar="N",
-        help="number of s (resolution) control points",
-    )
-    offset_group.add_argument(
-        "--offset.niter", dest="offset_niter", default=5, type=int, metavar="N", help="maximum iterations in refinement"
-    )
-    offset_group.add_argument(
-        "--offset.x2tol",
-        dest="offset_x2tol",
-        default=1e-3,
-        type=float,
-        metavar="TOL",
-        help="maximum change in x2 to stop refinement early",
-    )
-    offset_group.add_argument(
-        "--offset.outlier",
-        dest="offset_outlier",
-        default=5,
-        type=float,
-        metavar="NSIGMA",
-        help="standard error cutoff for outlier rejection after refinement",
-    )
-
-    detector_group = parser.add_argument_group(title="Detector parameters")
-    detector_group.add_argument(
-        "--detector.enable",
-        dest="detector_enable",
-        default=False,
-        metavar="TF",
-        help="include smooth scale vs. detector xy position",
-    )
-    detector_group.add_argument(
-        "--detector.alpha",
-        dest="detector_alpha",
-        default=1.0,
-        type=float,
-        metavar="ALPHA",
-        help="smoothness vs. xy position: multiplies the regularization parameter",
-    )
-    detector_group.add_argument(
-        "--detector.nx",
-        dest="detector_nx",
-        default=200,
-        type=float,
-        metavar="N",
-        help="number of grid control points in the x direction",
-    )
-    detector_group.add_argument(
-        "--detector.ny",
-        dest="detector_ny",
-        default=200,
-        type=float,
-        metavar="N",
-        help="number of grid control points in the y direction",
-    )
-    detector_group.add_argument(
-        "--detector.niter",
-        dest="detector_niter",
-        default=5,
-        type=int,
-        metavar="N",
-        help="maximum iterations in refinement",
-    )
-    detector_group.add_argument(
-        "--detector.x2tol",
-        dest="detector_x2tol",
-        default=1e-3,
-        type=float,
-        metavar="TOL",
-        help="maximum change in x2 to stop refinement early",
-    )
-    detector_group.add_argument(
-        "--detector.outlier",
-        dest="detector_outlier",
-        default=5,
-        type=float,
-        metavar="NSIGMA",
-        help="standard error cutoff for outlier rejection after refinement",
-    )
-
-    absorption_group = parser.add_argument_group(title="Absorption parameters")
-    absorption_group.add_argument(
-        "--absorption.enable",
-        dest="absorption_enable",
-        default=False,
-        metavar="TF",
-        help="include smooth scale vs. detector xy position and phi",
-    )
-    absorption_group.add_argument(
-        "--absorption.alpha_xy",
-        dest="absorption_alpha_xy",
-        default=10.0,
-        type=float,
-        metavar="ALPHA",
-        help="smoothness vs. xy position: multiplies the regularization parameter",
-    )
-    absorption_group.add_argument(
-        "--absorption.alpha_z",
-        dest="absorption_alpha_z",
-        default=1.0,
-        type=float,
-        metavar="ALPHA",
-        help="smoothness vs. phi: multiplies the regularization parameter",
-    )
-    absorption_group.add_argument(
-        "--absorption.nx",
-        dest="absorption_nx",
-        default=20,
-        type=float,
-        metavar="N",
-        help="number of grid control points in the x direction",
-    )
-    absorption_group.add_argument(
-        "--absorption.ny",
-        dest="absorption_ny",
-        default=20,
-        type=float,
-        metavar="N",
-        help="number of grid control points in the y direction",
-    )
-    absorption_group.add_argument(
-        "--absorption.dphi",
-        dest="absorption_dphi",
-        default=5.0,
-        type=float,
-        metavar="DEGREES",
-        help="spacing of phi control points in degrees",
-    )
-    absorption_group.add_argument(
-        "--absorption.niter",
-        dest="absorption_niter",
-        default=5,
-        type=int,
-        metavar="N",
-        help="maximum iterations in refinement",
-    )
-    absorption_group.add_argument(
-        "--absorption.x2tol",
-        dest="absorption_x2tol",
-        default=1e-4,
-        type=float,
-        metavar="TOL",
-        help="maximum change in x2 to stop refinement early",
-    )
-    absorption_group.add_argument(
-        "--absorption.outlier",
-        dest="absorption_outlier",
-        default=5,
-        type=float,
-        metavar="NSIGMA",
-        help="standard error cutoff for outlier rejection after refinement",
-    )
-
-    params = parser.parse_args(args)
-
-    for param in [
-        "scaling_enable",
-        "offset_enable",
-        "detector_enable",
-        "absorption_enable",
-    ]:
-        if getattr(params, param) is None:
-            setattr(params, param, False)
-        elif getattr(params, param) in [True, "True", "true", "1", "T", "t"]:
-            setattr(params, param, True)
-        elif getattr(params, param) in [False, "False", "false", "0", "F", "f"]:
-            setattr(params, param, False)
-        else:
-            raise SystemExit(f"Invalid value for {param}: {getattr(params, param)}. Must be True or False.")
-
-    if params.mca2020:
-        params.scaling_enable = True
-        params.detector_enable = True
-        params.absorption_enable = True
-        params.offset_enable = True
-
-    def generate_default_outfiles(infiles):
-        dirs = [os.path.dirname(fn) for fn in infiles]
-        if len(set(dirs)) == len(dirs):  # dirs are unique
-            return [os.path.join(d, "scales.nxs") for d in dirs]
-        if len(set(dirs)) == 1:  # dirs are identical
-            roots = [os.path.splitext(os.path.split(fn)[-1])[0] for fn in infiles]
-            if all(["_" in root for root in roots]):
-                postfix = [root.split("_")[-1] for root in roots]
-                if len(set(postfix)) == len(postfix):  # postfixes are unique
-                    return [os.path.join(dirs[0], f"scales_{pf}.nxs") for pf in postfix]
-
-    if params.outfile is None:
-        params.outfile = generate_default_outfiles(params.hkl)
-        if params.outfile is None:
+    if opts.parameters.outfile is None:
+        opts.parameters.outfile = generate_default_outfiles(opts.parameters.hkl)
+        if opts.parameters.outfile is None:
             raise SystemExit("unable to auto-generate output file names from input name pattern")
 
-    return params
+    return opts.parameters
 
 
 def run_scale(params):
     """Run the scale algorithm"""
     hkl = params.hkl
     outfile = params.outfile
-    scaling_enable = params.scaling_enable
-    offset_enable = params.offset_enable
-    absorption_enable = params.absorption_enable
-    detector_enable = params.detector_enable
-    scaling_alpha = params.scaling_alpha
-    scaling_dphi = params.scaling_dphi
-    scaling_niter = params.scaling_niter
-    scaling_x2tol = params.scaling_x2tol
-    scaling_outlier = params.scaling_outlier
-    offset_alpha_x = params.offset_alpha_x
-    offset_alpha_y = params.offset_alpha_y
-    offset_alpha_min = params.offset_alpha_min
-    offset_min = params.offset_min
-    offset_dphi = params.offset_dphi
-    offset_ns = params.offset_ns
-    offset_niter = params.offset_niter
-    offset_x2tol = params.offset_x2tol
-    offset_outlier = params.offset_outlier
-    detector_alpha = params.detector_alpha
-    detector_nx = params.detector_nx
-    detector_ny = params.detector_ny
-    detector_niter = params.detector_niter
-    detector_x2tol = params.detector_x2tol
-    detector_outlier = params.detector_outlier
-    absorption_alpha_xy = params.absorption_alpha_xy
-    absorption_alpha_z = params.absorption_alpha_z
-    absorption_nx = params.absorption_nx
-    absorption_ny = params.absorption_ny
-    absorption_dphi = params.absorption_dphi
-    absorption_niter = params.absorption_niter
-    absorption_x2tol = params.absorption_x2tol
-    absorption_outlier = params.absorption_outlier
+    scaling_enable = params.scaling.enable
+    offset_enable = params.offset.enable
+    absorption_enable = params.absorption.enable
+    detector_enable = params.detector.enable
+    scaling_alpha = params.scaling.alpha
+    scaling_dphi = params.scaling.dphi
+    scaling_niter = params.scaling.niter
+    scaling_x2tol = params.scaling.x2tol
+    scaling_outlier = params.scaling.outlier
+    offset_alpha_x = params.offset.alpha_x
+    offset_alpha_y = params.offset.alpha_y
+    offset_alpha_min = params.offset.alpha_min
+    offset_min = params.offset.min
+    offset_dphi = params.offset.dphi
+    offset_ns = params.offset.ns
+    offset_niter = params.offset.niter
+    offset_x2tol = params.offset.x2tol
+    offset_outlier = params.offset.outlier
+    detector_alpha = params.detector.alpha
+    detector_nx = params.detector.nx
+    detector_ny = params.detector.ny
+    detector_niter = params.detector.niter
+    detector_x2tol = params.detector.x2tol
+    detector_outlier = params.detector.outlier
+    absorption_alpha_xy = params.absorption.alpha_xy
+    absorption_alpha_z = params.absorption.alpha_z
+    absorption_nx = params.absorption.nx
+    absorption_ny = params.absorption.ny
+    absorption_dphi = params.absorption.dphi
+    absorption_niter = params.absorption.niter
+    absorption_x2tol = params.absorption.x2tol
+    absorption_outlier = params.absorption.outlier
 
     # load data into a giant table
     tabs = []

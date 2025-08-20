@@ -2,7 +2,10 @@
 Bin down an image stack
 """
 
-import argparse
+from dataclasses import dataclass
+from typing import Optional, Tuple
+
+from simple_parsing import ArgumentParser, field
 
 from mdx2.utils import (
     loadobj,
@@ -11,21 +14,24 @@ from mdx2.utils import (
 )
 
 
+@dataclass
+class Parameters:
+    """Options for binning a series of images in the phi and xy directions"""
+
+    data: str = field(positional=True)  # NeXus data file containing the image_series
+    bins: Tuple[int, int, int] = field(positional=True)  # number per bin in each direction (frames, y, x)
+    mask: Optional[str]  # name of NeXus file containing the mask
+    valid_range: Optional[Tuple[int, int]]  # minimum and maximum valid data values
+    outfile: str = "binned.nxs"  # name of the output NeXus file
+    nproc: int = 1  # number of parallel processes
+
+
 def parse_arguments(args=None):
     """Parse commandline arguments"""
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument("data", help="NeXus data file containing the image_series")
-    parser.add_argument("bins", nargs=3, type=int, metavar="N", help="number per bin in each direction (frames, y, x)")
-    parser.add_argument("--outfile", default="binned.nxs", help="name of the output NeXus file")
-    parser.add_argument("--valid_range", nargs=2, type=int, metavar="N", help="minimum and maximum valid data values")
-    parser.add_argument("--nproc", type=int, default=1, metavar="N", help="number of parallel processes")
-    parser.add_argument("--mask", help="name of NeXus file containing the mask")
-    params = parser.parse_args(args)
-
-    return params
+    parser = ArgumentParser(description=__doc__)
+    parser.add_arguments(Parameters, dest="parameters")
+    opts = parser.parse_args(args)
+    return opts.parameters
 
 
 def run_bin_image_series(params):
