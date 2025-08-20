@@ -129,7 +129,31 @@ class InterpLin3:
 
     @property
     def B(self):
-        raise NotImplementedError
+        Nx, Ny, Nz = self.shape
+        k, l, m = np.meshgrid(np.arange(Nx), np.arange(Ny), np.arange(Nz), indexing="ij")
+
+        # Neighbor indices
+        right = self._sub2ind(k[1:, :, :], l[1:, :, :], m[1:, :, :]).ravel(order="F")
+        left = self._sub2ind(k[:-1, :, :], l[:-1, :, :], m[:-1, :, :]).ravel(order="F")
+        up = self._sub2ind(k[:, 1:, :], l[:, 1:, :], m[:, 1:, :]).ravel(order="F")
+        down = self._sub2ind(k[:, :-1, :], l[:, :-1, :], m[:, :-1, :]).ravel(order="F")
+        front = self._sub2ind(k[:, :, :-1], l[:, :, :-1], m[:, :, :-1]).ravel(order="F")
+        back = self._sub2ind(k[:, :, 1:], l[:, :, 1:], m[:, :, 1:]).ravel(order="F")
+
+        # Flatten all neighbor indices
+        row_index = np.concatenate((left, right, down, up, front, back))
+        col_index = np.concatenate((right, left, up, down, back, front))
+        vals = np.ones_like(row_index, dtype=np.double)
+        shape = (Nx * Ny * Nz, Nx * Ny * Nz)
+        L = sparse.coo_matrix((vals, (row_index, col_index)), shape=shape)
+
+        # Weight according to number of neighbors
+        nn = np.asarray(L.sum(axis=1)).flatten()
+        W = sparse.diags(1 / nn)
+        L = W @ L
+
+        # Center minus average of neighbors
+        return sparse.eye(shape[0]) - L
 
     @property
     def Bxy(self):
