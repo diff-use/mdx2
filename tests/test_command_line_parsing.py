@@ -344,10 +344,10 @@ def test_bin_image_series_parse_arguments(args, expected, raises):
                 "outlier": 3.0,
                 "split": "randomHalf",
                 "geometry": None,
-                "no_scaling": False,
-                "no_offset": False,
-                "no_absorption": False,
-                "no_detector": False,
+                "scaling": True,
+                "offset": True,
+                "absorption": True,
+                "detector": True,
             },
             None,
         ),
@@ -371,10 +371,10 @@ def test_bin_image_series_parse_arguments(args, expected, raises):
                 "outlier": 3.0,
                 "split": "randomHalf",
                 "geometry": None,
-                "no_scaling": False,
-                "no_offset": False,
-                "no_absorption": False,
-                "no_detector": False,
+                "scaling": True,
+                "offset": True,
+                "absorption": True,
+                "detector": True,
             },
             None,
         ),
@@ -411,10 +411,10 @@ def test_merge_parse_arguments(args, expected, raises):
         assert params.outlier == expected["outlier"]
         assert params.split == expected["split"]
         assert params.geometry == expected["geometry"]
-        assert params.no_scaling is expected["no_scaling"]
-        assert params.no_offset is expected["no_offset"]
-        assert params.no_absorption is expected["no_absorption"]
-        assert params.no_detector is expected["no_detector"]
+        assert params.scaling is expected["scaling"]
+        assert params.offset is expected["offset"]
+        assert params.absorption is expected["absorption"]
+        assert params.detector is expected["detector"]
 
 
 @pytest.mark.parametrize(
@@ -541,13 +541,13 @@ def test_integrate_parse_arguments(args, expected, raises):
             ],
             {
                 "hkl": ["crystal1/integrated.nxs", "crystal2/integrated.nxs"],
-                "absorption_enable": True,
-                "absorption_nx": 10,
-                "absorption_ny": 10,
-                "absorption_dphi": 15.0,
-                "absorption_niter": 5,
-                "absorption_x2tol": 0.01,
-                "absorption_outlier": 3.0,
+                "absorption.enable": True,
+                "absorption.nx": 10,
+                "absorption.ny": 10,
+                "absorption.dphi": 15.0,
+                "absorption.niter": 5,
+                "absorption.x2tol": 0.01,
+                "absorption.outlier": 3.0,
                 "outfile": ["crystal1/scales.nxs", "crystal2/scales.nxs"],
             },
             None,
@@ -574,13 +574,13 @@ def test_integrate_parse_arguments(args, expected, raises):
             ],
             {
                 "hkl": ["crystal1/integrated.nxs", "crystal2/integrated.nxs"],
-                "absorption_enable": True,
-                "absorption_nx": 10,
-                "absorption_ny": 10,
-                "absorption_dphi": 15.0,
-                "absorption_niter": 5,
-                "absorption_x2tol": 0.01,
-                "absorption_outlier": 3.0,
+                "absorption.enable": True,
+                "absorption.nx": 10,
+                "absorption.ny": 10,
+                "absorption.dphi": 15.0,
+                "absorption.niter": 5,
+                "absorption.x2tol": 0.01,
+                "absorption.outlier": 3.0,
                 "outfile": ["crystal1/scales.nxs", "crystal2/scales.nxs"],
             },
             None,
@@ -607,13 +607,13 @@ def test_integrate_parse_arguments(args, expected, raises):
             ],
             {
                 "hkl": ["integrated_1.nxs", "integrated_2.nxs"],
-                "absorption_enable": True,
-                "absorption_nx": 10,
-                "absorption_ny": 10,
-                "absorption_dphi": 15.0,
-                "absorption_niter": 5,
-                "absorption_x2tol": 0.01,
-                "absorption_outlier": 3.0,
+                "absorption.enable": True,
+                "absorption.nx": 10,
+                "absorption.ny": 10,
+                "absorption.dphi": 15.0,
+                "absorption.niter": 5,
+                "absorption.x2tol": 0.01,
+                "absorption.outlier": 3.0,
                 "outfile": ["scales_1.nxs", "scales_2.nxs"],
             },
             None,
@@ -628,11 +628,11 @@ def test_scale_parse_arguments(args, expected, raises):
     else:
         params = scale_parse_arguments(args=args)
         assert params.hkl == expected["hkl"]
-        assert params.absorption_enable == expected["absorption_enable"]
-        assert params.absorption_nx == expected["absorption_nx"]
-        assert params.absorption_ny == expected["absorption_ny"]
-        assert params.absorption_dphi == expected["absorption_dphi"]
-        assert params.absorption_niter == expected["absorption_niter"]
-        assert params.absorption_x2tol == expected["absorption_x2tol"]
-        assert params.absorption_outlier == expected["absorption_outlier"]
+        assert params.absorption.enable == expected["absorption.enable"]
+        assert params.absorption.nx == expected["absorption.nx"]
+        assert params.absorption.ny == expected["absorption.ny"]
+        assert params.absorption.dphi == expected["absorption.dphi"]
+        assert params.absorption.niter == expected["absorption.niter"]
+        assert params.absorption.x2tol == expected["absorption.x2tol"]
+        assert params.absorption.outlier == expected["absorption.outlier"]
         assert params.outfile == expected["outfile"]
