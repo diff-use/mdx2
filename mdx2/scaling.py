@@ -676,6 +676,15 @@ class ScaledData:
         sigmam = 1 / np.sqrt(wm)
         return Im, sigmam, counts
 
+    def mask_singletons(self):
+        """Mask out reflections that only have one observation"""
+        n = self._ihmax + 1
+        counts = np.bincount(self._ih, minlength=n, weights=~self.mask)
+        singletons = counts <= 1
+        is_singleton = singletons[self._ih] & ~(self.mask)
+        self.mask[is_singleton] = True  # apply singleton masks
+        return is_singleton.sum()
+
     def mask_outliers(self, Im, nsigma):
         resid = (self.scale * (Im[self._ih] + self.offset) - self._I) / self._sigma
         isoutlier = (resid > nsigma) & ~(self.mask)
