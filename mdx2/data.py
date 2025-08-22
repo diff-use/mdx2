@@ -85,6 +85,22 @@ class HKLTable:
     def __len__(self):
         return len(self.h)
 
+    def __getitem__(self, key):
+        """Get item by key or slice"""
+        if isinstance(key, str):
+            return self.__dict__[key]
+        elif isinstance(key, slice):
+            return HKLTable(
+                self.h[key],
+                self.k[key],
+                self.l[key],
+                ndiv=self.ndiv,
+                **{k: v[key] for k, v in self.__dict__.items() if k not in ["h", "k", "l", "ndiv"]},
+            )
+        else:
+            raise TypeError("Key must be a string or a slice")
+        # TODO: allow fancy indexing if all columns are numpy arrays
+
     def to_frame(self):
         """convert to pandas dataframe"""
         cols = {k: self.__dict__[k] for k in self.__dict__ if k not in ["ndiv"]}
