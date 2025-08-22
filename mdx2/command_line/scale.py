@@ -71,7 +71,7 @@ class DetectorModelParameters:
 class AbsorptionModelParameters:
     """Options to control refinement of the absorption model"""
 
-    enable: bool = True  # include smooth scale vs. detector xy position and phi
+    enable: bool = False  # include smooth scale vs. detector xy position and phi
     alpha_xy: float = 10.0  # smoothness vs. xy position: multiplies the regularization parameter
     alpha_z: float = 1.0  # smoothness vs. phi: multiplies the regularization parameter
     nx: int = 20  # number of grid control points in the x direction
