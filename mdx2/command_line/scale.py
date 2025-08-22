@@ -264,8 +264,7 @@ def load_data_for_scaling(*hkl_files, subsample=None, merge_isotropic=False):
     for n, fn in enumerate(hkl_files):
         tmp = loadobj(fn, "hkl_table")
         if subsample is not None:
-            raise NotImplementedError("subsampling not implemented yet")
-            # tmp = tmp[::subsample]
+            tmp = tmp[::subsample]
         tmp.batch = n * np.ones_like(tmp.op)
         tabs.append(tmp)
 
@@ -294,7 +293,12 @@ def load_data_for_scaling(*hkl_files, subsample=None, merge_isotropic=False):
 def run_scale(params):
     """Run the scale algorithm"""
 
-    S = load_data_for_scaling(*params.hkl)
+    if params.prescale.enable and params.prescale.subsample > 1:
+        subsample = params.prescale.subsample
+    else:
+        subsample = None
+
+    S = load_data_for_scaling(*params.hkl, subsample=subsample)
 
     MR = BatchModelRefiner(S)
 
