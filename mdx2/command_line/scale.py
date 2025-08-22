@@ -299,12 +299,7 @@ def load_data_for_scaling(*hkl_files, subsample=None, merge_isotropic=False):
 def run_scale(params):
     """Run the scale algorithm"""
 
-    if params.prescale.enable and params.prescale.subsample > 1:
-        subsample = params.prescale.subsample
-    else:
-        subsample = None
-
-    S = load_data_for_scaling(*params.hkl, subsample=subsample)
+    S = load_data_for_scaling(*params.hkl)
 
     MR = BatchModelRefiner(S)
 
@@ -328,6 +323,46 @@ def run_scale(params):
             nix=params.detector.nx,
             niy=params.detector.ny,
         )
+
+    # prescaling phase
+    if params.prescale.enable:
+        if params.prescale.subsample > 1:
+            subsample = params.prescale.subsample
+        else:
+            subsample = None
+        S_pre = load_data_for_scaling(*params.hkl, subsample=subsample, merge_isotropic=params.prescale.isotropic)
+        MR_pre = BatchModelRefiner(S_pre)
+        # transfer models to prescaling refiner
+        for model_refiner, model_refiner_pre in zip(MR._batch_refiners, MR_pre._batch_refiners):
+            model_refiner_pre.scaling.model = model_refiner.scaling.model
+            model_refiner_pre.offset.model = model_refiner.offset.model
+            model_refiner_pre.detector.model = model_refiner.detector.model
+            model_refiner_pre.absorption.model = model_refiner.absorption.model
+        # refine models on prescaling data
+        print("starting prescaling refinement")
+        if params.prescale.scaling and params.scaling.enable:
+            print("optimizing scale vs. phi (b)")
+            refine_scaling_model(MR_pre, params.scaling)
+            mask_outliers(MR_pre, params.scaling.outlier)
+        if params.prescale.offset and params.prescale.scaling and params.offset.enable and params.scaling.enable:
+            print("optimizing scaling and offset models together (b,c)")
+            refine_scaling_and_offset_model(MR_pre, params.scaling, params.offset)
+            mask_outliers(MR_pre, params.offset.outlier)
+        if params.prescale.offset and params.offset.enable:
+            print("optimizing offset vs. phi and resolution (c)")
+            refine_offset_model(MR_pre, params.offset)
+            mask_outliers(MR_pre, params.offset.outlier)
+        if params.prescale.detector and params.detector.enable:
+            print("optimizing scale vs. detector position (d)")
+            refine_detector_model(MR_pre, params.detector)
+            mask_outliers(MR_pre, params.detector.outlier)
+        if params.prescale.absorption and params.absorption.enable:
+            print("optimizing scale vs. detector position and phi (a)")
+            refine_absorption_model(MR_pre, params.absorption)
+            mask_outliers(MR_pre, params.absorption.outlier)
+        print("finished prescaling refinement")
+
+    print("starting main scaling refinement")
 
     if params.scaling.enable:
         print("optimizing scale vs. phi (b)")
