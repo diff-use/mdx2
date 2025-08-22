@@ -273,10 +273,13 @@ def load_data_for_scaling(*hkl_files, subsample=None, merge_isotropic=False):
     print(f"loaded {len(hkl)} reflections from {len(hkl_files)} files")
 
     if merge_isotropic:
-        raise NotImplementedError("isotropic averaging not implemented yet")
+        # TODO: should bin width be a parameter?
+        # (here we use 0.001 as a default bin width)
+        print("Grouping observations by scattering vector length (isotropic averaging)")
+        index_map = np.floor(hkl.s * 1000).astype(np.uint16)
     else:
         print("Grouping redundant observations")
-        (h, k, l), index_map, counts = hkl.unique()
+        _, index_map, _ = hkl.unique()
 
     S = ScaledData(
         hkl.intensity,
