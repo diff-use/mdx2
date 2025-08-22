@@ -270,6 +270,8 @@ def load_data_for_scaling(*hkl_files, subsample=None, merge_isotropic=False):
 
     hkl = HKLTable.concatenate(tabs)
 
+    print(f"loaded {len(hkl)} reflections from {len(hkl_files)} files")
+
     if merge_isotropic:
         raise NotImplementedError("isotropic averaging not implemented yet")
     else:
@@ -286,6 +288,10 @@ def load_data_for_scaling(*hkl_files, subsample=None, merge_isotropic=False):
         iy=hkl.iy,
         batch=hkl.batch,
     )
+
+    nsingletons = S.mask_singletons()
+    if nsingletons > 0:
+        print(f"masked {nsingletons} singletons (reflections with only one observation)")
 
     return S
 
