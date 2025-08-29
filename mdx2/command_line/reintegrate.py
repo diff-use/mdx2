@@ -9,12 +9,14 @@ import numpy as np
 from joblib import Parallel, delayed
 from simple_parsing import ArgumentParser, field
 
-from mdx2.data import HKLTable, HKLGrid
+from mdx2.data import HKLGrid
 from mdx2.utils import (
     loadobj,
     nxload,  # mask is too big to read all at once?
     saveobj,
 )
+
+# TODO: implement splitting
 
 
 @dataclass
@@ -27,8 +29,6 @@ class Parameters:
     subdivide: Tuple[int, int, int] = (1, 1, 1)  # subdivisions of the Miller index grid
     scale: Optional[str] = None  # NeXus file with scaling model
     background: Optional[str] = None  # NeXus file with background binned_image_series
-    split: Optional[str] = field(choices=["randomHalf", "weightedRandomHalf", "Friedel"])
-    """also merge data into separate columns based on splitting criteria"""
     nproc: int = 1  # number of parallel processes
     outfile: str = "reintegrated.nxs"  # name of the output data
 
@@ -42,7 +42,6 @@ def parse_arguments(args=None):
 
 
 def run_reintegrate(params):
-    # TODO: implement splitting
     # TODO: what if scaling models are missing from the nexus file?
 
     miller_index = loadobj(params.geom, "miller_index")
