@@ -227,6 +227,175 @@ class HKLTable:
         return HKLTable(h, k, l, **data)
 
 
+class HKLGrid:
+    """Container for data on a grid indexed by h,k,l
+
+    Provides a similar interface to mdx2.geometry.GridData, but is specialized for conversion to/from HKLTable
+    """
+
+    axes_names = ("h", "k", "l")
+
+    def __init__(
+        self, data: dict, ndiv: tuple[int, int, int] = (1, 1, 1), ori: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    ):
+        if len(ndiv) != 3:
+            raise ValueError("ndiv must be a tuple of length 3")
+        if len(ori) != 3:
+            raise ValueError("ori must be a tuple of length 3")
+        if not all(isinstance(o, (int, float)) for o in ori):
+            raise ValueError("ori must be a tuple of numbers")
+        if not all(isinstance(n, int) and n > 0 for n in ndiv):
+            raise ValueError("ndiv must be a tuple of positive integers")
+        if not all(isinstance(d, np.ndarray) for d in data.values()):
+            raise ValueError("data must be a dictionary of numpy arrays")
+        if not all(d.ndim == 3 for d in data.values()):
+            raise ValueError("data arrays must be 3-dimensional")
+        shapes = [d.shape for d in data.values()]
+        if not all(s == shapes[0] for s in shapes):
+            raise ValueError("data arrays must have the same shape")
+        self.ndiv = ndiv
+        self.ori = ori
+        self._data = data
+        # TODO: there is a potential issue of ori*ndiv not being integer, which could lead to unexpected behavior
+
+    @property
+    def axes(self):
+        return tuple(np.arange(n) / ndiv + o for n, ndiv, o in zip(self.shape, self.ndiv, self.ori))
+
+    @property
+    def ncols(self):
+        return len(self._data)
+
+    @property
+    def shape(self):
+        sh = (0, 0, 0)
+        for d in self._data.values():
+            sh = tuple(max(s, ds) for s, ds in zip(sh, d.shape))
+        return sh
+
+    def __getitem__(self, key):
+        """Get item by key or slice
+
+        usage:
+        - grid["h"] to get the "h" data
+        - grid[:50,:50,:50] to get a sub-grid
+        """
+        if isinstance(key, str):
+            return self._data[key]
+        elif isinstance(key, tuple):  # tuple of slices
+            new_ori = tuple(ax[sl][0] for ax, sl in zip(self.axes, key))
+            return HKLGrid(
+                {k: v[key] for k, v in self._data.items()},
+                ndiv=self.ndiv,
+                ori=new_ori,
+            )
+        else:
+            raise TypeError("Key must be a string or a tuple of slices")
+
+    def _coords_to_indices(self, *hkl):
+        """convert hkl coordinates to array indices
+
+        ix, iy, iz = self._coords_to_indices(h, k, l)
+        """
+        indices = tuple(np.round((np.array(h) - o) * ndiv).astype(int) for h, o, ndiv in zip(hkl, self.ori, self.ndiv))
+        return indices
+
+    def _bounds_from_coords(self, *coords):
+        bounds = tuple(np.array([np.min(j), np.max(j)]) for j in coords)
+        return bounds
+
+    def _padding_from_bounds(self, *bounds):
+        """Amount to pad the data in each direction in order to contain a new set of coordinates
+
+        padding = self._padding_from_bounds((hmin, hmax), (kmin, kmax), (lmin, lmax))
+
+        returns None if bounds are contained within current array
+        """
+        indices = self._coords_to_indices(*bounds)
+        padding = tuple((max(-ind[0], 0), max(ind[1] - n + 1, 0)) for n, ind in zip(self.shape, indices))
+        if not np.any(padding):
+            padding = None
+        return padding
+
+    def _is_in_bounds(self, *coords):
+        """returns a boolean array that is true for all coordinates within the bounds of the array"""
+        indices = self._coords_to_indices(*coords)
+        cond = []
+        for ind, sh in zip(indices, self.shape):
+            cond.append(ind >= 0)
+            cond.append(ind < sh)
+        isincl = np.all(np.column_stack(cond), axis=1)
+        return isincl
+
+    def accumulate(self, *coords, resize=False, **values):
+        """Accumulate values on one or more data grids
+
+        Values can be an ndarray if ncols==1, otherwise values is a dictionary mapping to the keys in data.
+
+        There are two modes:
+        - resize=True, arrays will be resized if necessary to accomodate coordinates outside of current bounds
+        - resize=False, values will be silently excluded if they fall outside the current array bounds
+        """
+        if not isinstance(values, dict) and len(self._data) == 1:
+            k = list(self._data.keys())[0]
+            values = {k: values}
+        for k in values.keys():
+            if k not in self._data:
+                raise KeyError(f"key {k} not found in data")
+        bounds = self._bounds_from_coords(*coords)
+        padding = self._padding_from_bounds(*bounds)
+        if padding is not None:
+            if resize:
+                self.ori = tuple(o - p[0] / ndiv for o, ndiv, p in zip(self.ori, self.ndiv, padding))
+                self._data = {k: np.pad(v, pad_width=padding) for k, v in self._data.items()}
+            else:
+                isincl = self._is_in_bounds(*coords)
+                coords = tuple(np.array(c)[isincl] for c in coords)
+                values = {k: np.array(v)[isincl] for k, v in values.items()}
+        indices = self._coords_to_indices(*coords)
+        for k, v in values.items():
+            np.add.at(self._data[k], indices, v)
+        return self
+
+    def to_table(self, sparse=False):
+        """Convert to HKLTable object"""
+        hkl = np.meshgrid(*self.axes, indexing="ij")
+        hkl = [j.ravel() for j in hkl]
+        data_columns = {k: v.ravel() for k, v in self._data.items()}
+        if sparse:
+            # remove rows where all data values are zero
+            is_zero = np.all(np.column_stack([v == 0 for v in data_columns.values()]), axis=1)
+            hkl = [j[~is_zero] for j in hkl]
+            data_columns = {k: v[~is_zero] for k, v in data_columns.items()}
+        return HKLTable(*hkl, **data_columns, ndiv=self.ndiv)
+
+    def accumulate_from_table(self, tab, resize=False):
+        # check that ndiv is the same between table and grid:
+        if tab.ndiv != self.ndiv:
+            raise ValueError("ndiv values do not match")
+        self.accumulate(tab.h, tab.k, tab.l, **{k: tab[k] for k in tab._data_keys}, resize=resize)
+
+    @staticmethod
+    def from_table(tab):
+        # initialize arrays
+        data = {k: np.ndarray(shape=[0, 0, 0], dtype=tab[k].dtype) for k in tab._data_keys}
+        g = HKLGrid(data, ndiv=tab.ndiv, ori=(tab.h.min(), tab.k.min(), tab.l.min()))
+        g.accumulate_from_table(tab, resize=True)
+        return g
+
+    def to_nexus(self):
+        # TODO: implement this method
+        raise NotImplementedError("to_nexus is not implemented")
+
+    @staticmethod
+    def from_nexus(nexus_file):
+        # TODO: implement this method
+        raise NotImplementedError("from_nexus is not implemented")
+
+    def __repr__(self):
+        return f"HKLGrid with shape:{self.shape}, ori:{self.ori}, ndiv:{self.ndiv}, keys:{tuple(self._data.keys())}"
+
+
 class ImageSeries:
     """Image stack resulting from single sweep of data"""
 
