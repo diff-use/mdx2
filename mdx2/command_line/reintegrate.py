@@ -56,21 +56,6 @@ def run_reintegrate(params):
     detector_model = loadobj(params.scale, "detector_model") if params.scale else None
     mask = nxload(params.mask).entry.mask.signal if params.mask else None
 
-    def intchunk(sl):
-        ims = image_series[sl]
-        if mask is not None:
-            tab = ims.index(miller_index, mask=mask[sl].nxdata)  # added nxdata to deal with NXfield wrapper
-        else:
-            tab = ims.index(miller_index)
-        if len(tab) == 0:
-            return None  # signal that no pixels were integrated
-        tab.ndiv = params.subdivide
-        tab = tab.bin(count_name="pixels")
-        tab.phi /= tab.pixels
-        tab.iy /= tab.pixels
-        tab.ix /= tab.pixels
-        return tab
-
     def calc_corrections(tab):
         UB = crystal.ub_matrix
         s = UB @ np.stack((tab.h, tab.k, tab.l))
@@ -89,7 +74,23 @@ def run_reintegrate(params):
         tab.scale = tab.seconds * solid_angle * a * b * d
         tab.background_counts = tab.seconds * (bg_rate + c * a * d * solid_angle)
         tab = tab.to_asu(symmetry)
-        del tab.phi, tab.iy, tab.ix, tab.seconds, tab.s, tab.op
+        del tab.phi, tab.iy, tab.ix, tab.seconds, tab.s, tab.op, tab.pixels
+        return tab
+
+    def intchunk(sl):
+        ims = image_series[sl]
+        if mask is not None:
+            tab = ims.index(miller_index, mask=mask[sl].nxdata)  # added nxdata to deal with NXfield wrapper
+        else:
+            tab = ims.index(miller_index)
+        if len(tab) == 0:
+            return None  # signal that no pixels were integrated
+        tab.ndiv = params.subdivide
+        tab = tab.bin(count_name="pixels")
+        tab.phi /= tab.pixels
+        tab.iy /= tab.pixels
+        tab.ix /= tab.pixels
+        tab = calc_corrections(tab)
         return tab
 
     with Parallel(n_jobs=params.nproc, verbose=10, return_as="generator_unordered") as parallel:
@@ -99,11 +100,10 @@ def run_reintegrate(params):
         for tab in tab_chunk:
             if tab is None:
                 continue
-            corrected_table = calc_corrections(tab)
             if grid is None:
-                grid = HKLGrid.from_table(corrected_table)
+                grid = HKLGrid.from_table(tab)
             else:
-                grid.accumulate_from_table(corrected_table, resize=True)
+                grid.accumulate_from_table(tab, resize=True)
 
     if grid is None:
         raise ValueError("No valid data found")
@@ -114,7 +114,7 @@ def run_reintegrate(params):
     hkl_table.k = hkl_table.k.astype(np.float32)
     hkl_table.l = hkl_table.l.astype(np.float32)
     hkl_table.counts = hkl_table.counts.astype(np.int32)
-    hkl_table.background_counts = hkl_table.background_counts.astype(np.int32)
+    hkl_table.background_counts = hkl_table.background_counts.astype(np.float32)
     hkl_table.scale = hkl_table.scale.astype(np.float32)
     hkl_table.multiplicity = hkl_table.multiplicity.astype(np.float32)
     saveobj(hkl_table, params.outfile, name="hkl_table", append=False)
