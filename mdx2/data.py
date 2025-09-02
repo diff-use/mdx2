@@ -71,11 +71,11 @@ class Peaks:
 class HKLTable:
     """Container for data in a table with indices h,k,l"""
 
-    def __init__(self, h, k, l, ndiv=[1, 1, 1], **kwargs):
+    def __init__(self, h, k, l, ndiv=(1, 1, 1), **kwargs):
         self.h = h
         self.k = k
         self.l = l
-        self.ndiv = ndiv
+        self.ndiv = tuple(ndiv)
         self.__dict__.update(kwargs)
 
     @property
