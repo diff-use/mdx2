@@ -9,7 +9,7 @@ import numpy as np
 from joblib import Parallel, delayed
 from simple_parsing import ArgumentParser, field
 
-from mdx2.data import HKLGrid
+from mdx2.data import HKLGrid, HKLTable
 from mdx2.utils import (
     loadobj,
     nxload,  # mask is too big to read all at once?
@@ -91,7 +91,27 @@ def run_reintegrate(params):
         tab.iy /= tab.pixels
         tab.ix /= tab.pixels
         tab = calc_corrections(tab)
+        tab.h = tab.h.astype(np.float32)
+        tab.k = tab.k.astype(np.float32)
+        tab.l = tab.l.astype(np.float32)
         return tab
+
+    # TODO: check for memory limitations, consider using memory mapping for large datasets
+
+    print("calculating Miller index range for the output grid")
+    hkl = HKLTable(miller_index.h.ravel(), miller_index.k.ravel(), miller_index.l.ravel(), ndiv=params.subdivide)
+    hkl = hkl.to_asu(symmetry)
+    array_range = (min(hkl.H.min(), 0), hkl.H.max(), min(hkl.K.min(), 0), hkl.K.max(), min(hkl.L.min(), 0), hkl.L.max())
+    array_size = tuple(r - l + 1 for l, r in zip(array_range[::2], array_range[1::2]))
+    array_ori = tuple(l / s for l, s in zip(array_range[::2], params.subdivide))
+    print("allocating empty output arrays")
+    data_arrays = {
+        "counts": np.zeros(array_size, dtype=np.uint32),
+        "background_counts": np.zeros(array_size, dtype=np.float32),
+        "scale": np.zeros(array_size, dtype=np.float32),
+        "multiplicity": np.zeros(array_size, dtype=np.float32),
+    }
+    grid = HKLGrid(data_arrays, ndiv=params.subdivide, ori=array_ori)
 
     with Parallel(n_jobs=params.nproc, verbose=10, return_as="generator_unordered") as parallel:
         slices = list(image_series.chunk_slice_iterator())
@@ -100,23 +120,13 @@ def run_reintegrate(params):
         for tab in tab_chunk:
             if tab is None:
                 continue
-            if grid is None:
-                grid = HKLGrid.from_table(tab)
-            else:
-                grid.accumulate_from_table(tab, resize=True)
-
-    if grid is None:
-        raise ValueError("No valid data found")
+            grid.accumulate_from_table(tab, resize=False)
 
     print(f"Saving table of integrated data to {params.outfile}")
     hkl_table = grid.to_table(sparse=True)
     hkl_table.h = hkl_table.h.astype(np.float32)
     hkl_table.k = hkl_table.k.astype(np.float32)
     hkl_table.l = hkl_table.l.astype(np.float32)
-    hkl_table.counts = hkl_table.counts.astype(np.int32)
-    hkl_table.background_counts = hkl_table.background_counts.astype(np.float32)
-    hkl_table.scale = hkl_table.scale.astype(np.float32)
-    hkl_table.multiplicity = hkl_table.multiplicity.astype(np.float32)
     saveobj(hkl_table, params.outfile, name="hkl_table", append=False)
     print("done!")
 
