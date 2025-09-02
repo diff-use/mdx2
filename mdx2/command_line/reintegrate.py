@@ -116,7 +116,6 @@ def run_reintegrate(params):
     with Parallel(n_jobs=params.nproc, verbose=10, return_as="generator_unordered") as parallel:
         slices = list(image_series.chunk_slice_iterator())
         tab_chunk = parallel(delayed(intchunk)(sl) for sl in slices)
-        grid = None
         for tab in tab_chunk:
             if tab is None:
                 continue
