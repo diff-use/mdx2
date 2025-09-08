@@ -3,7 +3,7 @@ Reintegrate on a different grid, applying corrections, scaling, and merging symm
 """
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Literal, Optional, Tuple
 
 import numpy as np
 from joblib import Parallel, delayed
@@ -30,6 +30,7 @@ class Parameters:
     scale: Optional[str] = None  # NeXus file with scaling model
     background: Optional[str] = None  # NeXus file with background binned_image_series
     nproc: int = 1  # number of parallel processes
+    output: Literal["counts", "intensity"] = "counts"  # counts or intensity
     outfile: str = "reintegrated.nxs"  # name of the output data
 
 
@@ -126,6 +127,13 @@ def run_reintegrate(params):
     hkl_table.h = hkl_table.h.astype(np.float32)
     hkl_table.k = hkl_table.k.astype(np.float32)
     hkl_table.l = hkl_table.l.astype(np.float32)
+    if params.output == "intensity":
+        hkl_table.intensity = (hkl_table.counts - hkl_table.background_counts) / hkl_table.scale
+        hkl_table.intensity_error = np.sqrt(hkl_table.counts) / hkl_table.scale
+        del hkl_table.counts, hkl_table.background_counts, hkl_table.scale
+        hkl_table.intensity = hkl_table.intensity.astype(np.float32)
+        hkl_table.intensity_error = hkl_table.intensity_error.astype(np.float32)
+
     saveobj(hkl_table, params.outfile, name="hkl_table", append=False)
     print("done!")
 
