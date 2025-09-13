@@ -17,6 +17,12 @@ from mdx2.utils import (
 )
 
 # TODO: implement splitting
+# TODO: unify with mdx2.integrate, mdx2.correct
+#   - allow reintegrate to run without scale and/or background
+#   - add option to output unmerged data
+#   - add option to use a dynamic mask
+# TODO: properly deal with outlier detection and rejection, similar to mdx2.merge
+#   - may require refactoring
 
 
 @dataclass
