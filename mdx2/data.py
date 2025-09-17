@@ -514,6 +514,8 @@ class ImageSeries:
                 # already saved to a file
                 new_data = self.data.__deepcopy__()
                 new_data.shape = (new_phi.size,) + new_data.shape[1:]
+                if new_data.chunks[0] > new_phi.size:
+                    new_data.chunks = (new_phi.size,) + new_data.chunks[1:]
             else:
                 new_data = self.data[sl]
             new_image_series = ImageSeries(
