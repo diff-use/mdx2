@@ -504,6 +504,27 @@ class ImageSeries:
                 for a3 in s3:
                     yield (a1, a2, a3)
 
+    def iter_slabs(self):
+        """generator of ImageSeries objects, each containing a slab of images along the phi axis"""
+        for sl in self.chunk_slice_along_axis(0):
+            new_phi = self.phi[sl]
+            new_exposure_times = self.exposure_times[sl]
+            if isinstance(self.data, NXfield) and self.data._value is None and self.data._memfile is None:
+                # TODO: there might be instances where this has strange behavior, for instance if the NXfield was
+                # already saved to a file
+                new_data = self.data.__deepcopy__()
+                new_data.shape = (new_phi.size,) + new_data.shape[1:]
+            else:
+                new_data = self.data[sl]
+            new_image_series = ImageSeries(
+                new_phi,
+                self.iy,
+                self.ix,
+                new_data,
+                new_exposure_times,
+            )
+            yield new_image_series
+
     @staticmethod
     def from_expt(exptfile):
         data_opts = {"dtype": np.int32, "compression": "gzip", "compression_opts": 1, "shuffle": True}
