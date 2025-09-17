@@ -46,6 +46,20 @@ class Experiment:
         return nimgs
 
     @property
+    def panel_offset(self):
+        """offset in pixels (stride) of successive panels in the image file
+
+        These offsets are estimated from the rectangular mask elements covering
+        the panel gaps, and may fail in cases where non-default masks are used.
+        """
+        # TODO: test for non-default masks or other conditions that could cause this to fail
+        # TODO: fall back on tabulated values (e.g. using the detector name or image size as lookup)
+        m = np.array(list(self._panel.get_mask()))
+        row_size = m[m[:, 0] == 0, 3].min()
+        col_size = m[m[:, 1] == 0, 2].min()
+        return row_size, col_size
+
+    @property
     def exposure_times(self):
         return np.array(tuple(self._scan.get_exposure_times()))
 
