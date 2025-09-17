@@ -506,17 +506,19 @@ class ImageSeries:
 
     @staticmethod
     def from_expt(exptfile):
-        data_opts = {"dtype": np.int32, "compression": "gzip", "compression_opts": 1, "shuffle": True, "chunks": True}
+        data_opts = {"dtype": np.int32, "compression": "gzip", "compression_opts": 1, "shuffle": True}
         expt = Experiment.from_file(exptfile)
         phi, iy, ix = expt.scan_axes
         shape = (phi.size, iy.size, ix.size)
+
         # estimate default chunk size
         panel_offset = expt.panel_offset
         dphi = expt.oscillation[1]
         nimgs = _default_stack_from_rotation_angle(dphi)
         nimgs = min(nimgs, shape[0])
         chunks = (nimgs,) + panel_offset
-        data = NXfield(shape=shape, name="data", **data_opts, chunks=chunks)
+
+        data = NXfield(shape=shape, name="data", chunks=chunks, **data_opts)
         exposure_times = expt.exposure_times
         return ImageSeries(phi, iy, ix, data, exposure_times)
 
