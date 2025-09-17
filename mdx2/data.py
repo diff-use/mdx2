@@ -507,11 +507,17 @@ class ImageSeries:
     @staticmethod
     def from_expt(exptfile):
         data_opts = {"dtype": np.int32, "compression": "gzip", "compression_opts": 1, "shuffle": True, "chunks": True}
-        E = Experiment.from_file(exptfile)
-        phi, iy, ix = E.scan_axes
+        expt = Experiment.from_file(exptfile)
+        phi, iy, ix = expt.scan_axes
         shape = (phi.size, iy.size, ix.size)
-        data = NXfield(shape=shape, name="data", **data_opts)
-        exposure_times = E.exposure_times
+        # estimate default chunk size
+        panel_offset = expt.panel_offset
+        dphi = expt.oscillation[1]
+        nimgs = _default_stack_from_rotation_angle(dphi)
+        nimgs = min(nimgs, shape[0])
+        chunks = (nimgs,) + panel_offset
+        data = NXfield(shape=shape, name="data", **data_opts, chunks=chunks)
+        exposure_times = expt.exposure_times
         return ImageSeries(phi, iy, ix, data, exposure_times)
 
     @staticmethod
@@ -579,3 +585,42 @@ class ImageSeries:
             counts=self.data[msk],
             seconds=exposure_times[msk],
         )
+
+
+# SOME UTILITY FUNCTIONS USED ABOVE
+
+
+def _default_stack_from_rotation_angle(ang):
+    """Compute a reasonable image stack size (1--50 images) given the rotation angle per frame (degrees)
+
+    The heuristics are designed to work with typical choices of angular range per image, such as
+    0.1, 0.025, 1/3, 0.04, etc. The algorithm chooses either 40, 45, or 50 image stack size if the
+    total oscillation is less than 6 degrees. Otherwise, it chooses a stack to give either 5 or 6 degrees
+    of total oscillation. If the heuristics fail, it will make a sane choice: 10 frames for large rotation
+    per frame, and 40 frames if the rotation is small, and 50 frames if there is no rotation.
+    """
+    if ang == 0:
+        numer, denom = 0, 1
+    else:
+        numer = 180
+        denom = np.round(numer / ang).astype(int)
+    if denom < numer * 7:
+        if 5 * denom % numer == 0:
+            nimgs = 5 * denom // numer
+        elif 6 * denom % numer == 0:
+            nimgs = 6 * denom // numer
+        else:
+            nimgs = 10
+    elif 2 * 50 * numer % denom == 0:
+        nimgs = 50
+    elif 2 * 40 * numer % denom == 0:
+        nimgs = 40
+    elif 2 * 45 * numer % denom == 0:
+        nimgs = 45
+    elif 4 * 50 * numer % denom == 0:
+        nimgs = 50
+    elif 4 * 45 * numer % denom == 0:
+        nimgs = 45
+    else:
+        nimgs = 40
+    return nimgs
