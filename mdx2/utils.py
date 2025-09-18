@@ -2,7 +2,7 @@ import importlib
 import logging
 
 import numpy as np
-from nexusformat.nexus import NXentry, NXFile, NXroot
+from nexusformat.nexus import NXentry, NXroot
 from nexusformat.nexus import nxload as nexus_nxload
 from scipy.ndimage import map_coordinates
 
@@ -24,11 +24,10 @@ def nxload(filename, mode="r", **kwargs):
 
 def nxsave(nxsobj, filename, mode="w", **kwargs):
     """Wrapper around nexusformat.nexus.nxsave to add mdx2 version."""
-    root = NXroot(NXentry(nxsobj))
-    with NXFile(filename, mode=mode, **kwargs) as f:
-        f.writefile(root)
-        f["/"].attrs["mdx2_version"] = mdx2.__version__
-        f.close()
+    nxroot = NXroot(NXentry(nxsobj))
+    nxroot.attrs["mdx2_version"] = mdx2.__version__
+    nxroot.save(filename, mode=mode, **kwargs)
+    return nxroot
 
 
 def loadobj(filename, objectname, verbose=True):
