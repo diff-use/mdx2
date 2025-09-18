@@ -1,4 +1,3 @@
-import logging
 import re
 
 import h5py as h5
