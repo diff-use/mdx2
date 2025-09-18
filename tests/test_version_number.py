@@ -1,9 +1,7 @@
-import logging
 import re
 
 import h5py as h5
 import numpy as np
-import pytest
 
 from mdx2 import __version__ as mdx2_version
 from mdx2.geometry import Crystal
