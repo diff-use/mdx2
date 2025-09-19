@@ -2,13 +2,24 @@ import importlib
 import logging
 
 import numpy as np
-from nexusformat.nexus import NXentry, NXroot
+from nexusformat.nexus import NXentry, NXgroup, NXroot, NXvirtualfield
 from nexusformat.nexus import nxload as nexus_nxload
 from scipy.ndimage import map_coordinates
 
 import mdx2
 
 # FUNCTIONS FOR LOADING AND SAVING MDX2 CLASSES TO NEXUS FILES
+
+
+def _patch_virtualfields(g):
+    """Recursively patch NXvirtualfields in a Nexus group to set their shape."""
+    if isinstance(g, NXgroup):
+        for entry in g.entries.values():
+            _patch_virtualfields(entry)
+    elif isinstance(g, NXvirtualfield):
+        print(f"patching virtual field: {g.nxpath}")
+        with g.nxfile as f:
+            g._shape = f.get(g.nxpath).shape
 
 
 def nxload(filename, mode="r", **kwargs):
@@ -19,6 +30,7 @@ def nxload(filename, mode="r", **kwargs):
         logging.warning(
             f"mdx2 version mismatch: file version {mdx2_version_file}, installed version {mdx2.__version__}"
         )
+    _patch_virtualfields(nxroot)
     return nxroot
 
 
