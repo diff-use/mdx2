@@ -4,7 +4,7 @@ View the NeXus file tree
 
 import argparse
 
-from nexusformat.nexus import nxload
+from mdx2.utils import nxload
 
 parser = argparse.ArgumentParser(
     description=__doc__,
