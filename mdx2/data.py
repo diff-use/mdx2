@@ -591,13 +591,13 @@ class ImageSeries:
                 sh = image_slab.data.shape
                 layout[sl, :, :] = h5py.VirtualSource(fn, data_path, shape=sh)
 
-            [print(fn, loadobj(fn, name=name)) for fn in files]  # for debugging
+            [print(fn, nxload(fn).tree) for fn in files]  # for debugging
             print(f"creating virtual dataset in {filename} from {len(files)} files")
             with h5py.File(filename, "r+", libver="latest") as f:
                 del f[data_path]
                 f.create_virtual_dataset(data_path, layout, fillvalue=self._maskval)
 
-            [print(fn, loadobj(fn, name=name)) for fn in files]  # for debugging
+            [print(fn, nxload(fn).tree) for fn in files]  # for debugging
 
             # reload the nxobj to pick up the virtual dataset
             nxobj = nxload(filename, mode="r")[f"/entry/{name}"]  # TODO: what mode should be used here?
