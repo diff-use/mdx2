@@ -5,11 +5,11 @@ import h5py
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from nexusformat.nexus import NXdata, NXfield, NXgroup, NXreflections
+from nexusformat.nexus import NXdata, NXfield, NXgroup, NXreflections, NXvirtualfield
 
 from mdx2.dxtbx_machinery import Experiment
 from mdx2.geometry import GridData
-from mdx2.utils import loadobj, nxload, saveobj, slice_sections
+from mdx2.utils import nxload, saveobj, slice_sections
 
 
 class Peaks:
@@ -479,12 +479,16 @@ class ImageSeries:
 
     @property
     def chunks(self):
-        if isinstance(self.data, NXfield):
+        if isinstance(self.data, NXvirtualfield):
+            ch = h5py.File(self.data._vfiles[0], "r")[self.data._vpath].chunks
+        elif isinstance(self.data, NXfield):
             ch = self.data.chunks
-            if ch is not None:
-                return ch
-        # return default chunks
-        return (1, self.shape[1], self.shape[2])
+        else:
+            ch = None
+        if ch is not None:
+            return ch
+        else:
+            return (1, self.shape[1], self.shape[2])
 
     def iter_chunks(self):
         for sl in self.chunk_slice_iterator():
