@@ -586,7 +586,8 @@ class ImageSeries:
 
             # write the source files, add to layout
             for image_slab, sl, fn in zip(self.iter_slabs(), slices, files):
-                saveobj(image_slab, fn, name=name)
+                v = saveobj(image_slab, fn, name=name)
+                print(fn, v.tree)  # for debugging
                 sh = image_slab.data.shape
                 layout[sl, :, :] = h5py.VirtualSource(fn, data_path, shape=sh)
 
