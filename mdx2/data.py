@@ -9,7 +9,7 @@ from nexusformat.nexus import NXdata, NXfield, NXgroup, NXreflections
 
 from mdx2.dxtbx_machinery import Experiment
 from mdx2.geometry import GridData
-from mdx2.utils import nxload, saveobj, slice_sections
+from mdx2.utils import loadobj, nxload, saveobj, slice_sections
 
 
 class Peaks:
@@ -571,14 +571,16 @@ class ImageSeries:
 
         If virtual=True, save the data as a virtual dataset, with each slab of images along the phi axis
         stored in a separate file. The source_template is used to generate the filenames for the source
-        files. The template should contain {prefix}, {index}, and {ext} fields, which will be replaced
+        files. The template may contain {prefix}, {name}, {index}, and {ext} fields, which will be replaced
         with the prefix of the main filename, the slab index, and the extension of the main filename, respectively.
         """
-        nxroot = saveobj(self, filename, name=name, **kwargs)
+        nxobj = saveobj(self, filename, name=name, **kwargs)
         if virtual:
             slices = [sl for sl in self.chunk_slice_along_axis(0)]
             prefix, ext = os.path.splitext(filename)
-            files = [source_template.format(prefix=prefix, index=index, ext=ext) for index in range(len(slices))]
+            files = [
+                source_template.format(prefix=prefix, name=name, index=index, ext=ext) for index in range(len(slices))
+            ]
             data_path = f"/entry/{name}/data"
             layout = h5py.VirtualLayout(shape=self.data.shape, dtype=self.data.dtype)
 
@@ -591,7 +593,10 @@ class ImageSeries:
             with h5py.File(filename, "r+", libver="latest") as f:
                 del f[data_path]
                 f.create_virtual_dataset(data_path, layout, fillvalue=self._maskval)
-        return nxroot
+
+            # reload the nxobj to pick up the virtual dataset
+            nxobj = nxload(filename, mode="r")[f"/entry/{name}"]  # TODO: what mode should be used here?
+        return nxobj
 
     @staticmethod
     def load(filename, name="image_series", mode="r"):
