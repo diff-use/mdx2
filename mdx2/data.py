@@ -574,7 +574,6 @@ class ImageSeries:
         files. The template may contain {prefix}, {name}, {index}, and {ext} fields, which will be replaced
         with the prefix of the main filename, the slab index, and the extension of the main filename, respectively.
         """
-        nxobj = saveobj(self, filename, name=name, **kwargs)
         if virtual:
             slices = [sl for sl in self.chunk_slice_along_axis(0)]
             prefix, ext = os.path.splitext(filename)
@@ -586,21 +585,24 @@ class ImageSeries:
 
             # write the source files, add to layout
             for image_slab, sl, fn in zip(self.iter_slabs(), slices, files):
-                v = saveobj(image_slab, fn, name=name)
-                print(fn, v.tree)  # for debugging
+                saveobj(image_slab, fn, name=name)
                 sh = image_slab.data.shape
                 layout[sl, :, :] = h5py.VirtualSource(fn, data_path, shape=sh)
 
-            [print(fn, nxload(fn).tree) for fn in files]  # for debugging
+            # NOTE: the ImageSeries should not be saved to a file until after iter_slabs() is called,
+            # this is because the shape of the NXfield will not be correctly written to the source file,
+            # some kind of bug that I don't have time to track down right now.
+            saveobj(self, filename, name=name, **kwargs)
+
             print(f"creating virtual dataset in {filename} from {len(files)} files")
             with h5py.File(filename, "r+", libver="latest") as f:
                 del f[data_path]
                 f.create_virtual_dataset(data_path, layout, fillvalue=self._maskval)
 
-            [print(fn, nxload(fn).tree) for fn in files]  # for debugging
-
             # reload the nxobj to pick up the virtual dataset
             nxobj = nxload(filename, mode="r")[f"/entry/{name}"]  # TODO: what mode should be used here?
+        else:
+            nxobj = saveobj(self, filename, name=name, **kwargs)
         return nxobj
 
     @staticmethod
