@@ -608,7 +608,7 @@ class ImageSeries:
     @staticmethod
     def load(filename, name="image_series", mode="r"):
         """Load from nexus file"""
-        nxroot = nxload(filename, objectname=name, mode=mode)
+        nxroot = nxload(filename, mode=mode)
         nxs = nxroot["/entry/" + name]
         mod = nxs.attrs["mdx2_module"]
         cls = nxs.attrs["mdx2_class"]
