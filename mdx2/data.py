@@ -566,6 +566,7 @@ class ImageSeries:
         iy = NXfield(self.iy, name="iy")
         if isinstance(self.data, NXfield):
             signal = self.data
+            signal.rename("data")  # just in case it had a different name
         else:
             signal = NXfield(self.data, name="data")
         return NXdata(signal=signal, axes=[phi, iy, ix], exposure_times=self.exposure_times)
@@ -605,6 +606,7 @@ class ImageSeries:
 
             # reload the nxobj to pick up the virtual dataset
             nxobj = nxload(filename, mode="r")[f"/entry/{name}"]  # TODO: what mode should be used here?
+            self.data = nxobj.data  # ensure the ImageSeries object has the virtual dataset as its data
         else:
             nxobj = saveobj(self, filename, name=name, **kwargs)
         return nxobj
