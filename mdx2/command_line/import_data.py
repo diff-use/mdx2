@@ -3,6 +3,7 @@ Import x-ray image data using the dxtbx machinery
 """
 
 from dataclasses import dataclass
+from typing import Optional
 
 from joblib import Parallel, delayed
 from simple_parsing import ArgumentParser, field
@@ -17,10 +18,10 @@ class Parameters:
     """Options for importing x-ray image data"""
 
     expt: str = field(positional=True)  # experiments file, such as from dials.import
-    chunks: tuple[int, int, int] = None  # chunking for compression (frames, y, x)
+    chunks: Optional[tuple[int, int, int]] = field(default=None, help="chunking for compression (frames, y, x)")
     outfile: str = "data.nxs"  # name of the output NeXus file
     nproc: int = 1  # number of parallel processes
-    datastore: str = None  # folder for storing source datasets
+    datastore: Optional[str] = None  # folder for storing source datasets
 
 
 def parse_arguments(args=None):
