@@ -9,7 +9,7 @@ def configure_logging(filename=None, level=logging.INFO):
     if filename is not None:
         # configure the logger
         file_handler = logging.FileHandler(filename)
-        file_formatter = logging.Formatter("%(asctime)s %(module)s %(levelname)s: %(message)s")
+        file_formatter = logging.Formatter("%(asctime)s %(levelname)s %(pathname)s: %(message)s")
         file_handler.setFormatter(file_formatter)
         file_handler.setLevel(level)
         handlers.append(file_handler)
