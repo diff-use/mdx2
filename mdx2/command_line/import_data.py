@@ -74,7 +74,7 @@ def run_import_data(params):
         slices = [sl for sl in image_series.chunk_slice_along_axis(0)]
         files = nxobj.data._vfiles
 
-        with Parallel(n_jobs=nproc, verbose=1) as parallel:
+        with Parallel(n_jobs=nproc, verbose=10) as parallel:
             parallel(delayed(write_stack)(sl.start, sl.stop, fn, nxobj.data._vpath) for sl, fn in zip(slices, files))
 
 
