@@ -1,3 +1,4 @@
+import logging
 import os
 from copy import deepcopy
 
@@ -10,6 +11,8 @@ from nexusformat.nexus import NXdata, NXfield, NXgroup, NXreflections, NXvirtual
 from mdx2.dxtbx_machinery import Experiment
 from mdx2.geometry import GridData
 from mdx2.utils import nxload, saveobj, slice_sections
+
+logger = logging.getLogger(__name__)
 
 
 class Peaks:
@@ -464,7 +467,7 @@ class ImageSeries:
         if nproc == 1:
             slabs = []
             for ind, sl in enumerate(sl_0):
-                print(f"binning frames {sl.start} to {sl.stop - 1}")
+                logger.info(f"binning frames {sl.start} to {sl.stop - 1}")
                 slabs.append(binslab(sl))
             new_data = np.stack(slabs)
         else:
@@ -610,7 +613,7 @@ class ImageSeries:
             # some kind of bug that I don't have time to track down right now.
             saveobj(self, filename, name=name, **kwargs)
 
-            print(f"creating virtual dataset in {filename} from {len(files)} files")
+            logger.info(f"creating virtual dataset in {filename} from {len(files)} files")
             with h5py.File(filename, "r+", libver="latest") as f:
                 del f[data_path]
                 f.create_virtual_dataset(data_path, layout, fillvalue=self._maskval)
@@ -633,7 +636,7 @@ class ImageSeries:
             raise ValueError(f"object {name} in file {filename} is not an mdx2.data.ImageSeries")
         return ImageSeries.from_nexus(nxs)
 
-    def find_peaks_above_threshold(self, threshold, verbose=True, nproc=1):
+    def find_peaks_above_threshold(self, threshold, nproc=1):
         """find pixels above a threshold"""
 
         def peaksearch(sl):
@@ -648,16 +651,14 @@ class ImageSeries:
             for ind, sl in enumerate(self.chunk_slice_iterator()):
                 peaks = peaksearch(sl)
                 if peaks is not None:
-                    if verbose:
-                        print(f"found {peaks.size} peaks in chunk {ind}")
+                    logger.info(f"found {peaks.size} peaks in chunk {ind}")
                     peaklist.append(peaks)
             peaks = Peaks.stack(peaklist)
         else:
             with Parallel(n_jobs=nproc, verbose=10) as parallel:
                 peaklist = parallel(delayed(peaksearch)(sl) for sl in self.chunk_slice_iterator())
             peaks = Peaks.stack([p for p in peaklist if p is not None])
-        if verbose:
-            print(f"found {peaks.size} peaks in total")
+        logger.info(f"found {peaks.size} peaks in total")
         return peaks
 
     def index(self, miller_index, mask=None):

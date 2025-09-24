@@ -1,3 +1,4 @@
+import logging
 import re
 from multiprocessing import JoinableQueue, Process
 
@@ -7,6 +8,8 @@ from dxtbx import flumpy
 from dxtbx.model.experiment_list import ExperimentList
 from joblib import Parallel, delayed
 from scitbx import matrix
+
+logger = logging.getLogger(__name__)
 
 
 class Experiment:
@@ -284,10 +287,9 @@ class ImageSet:
         nx, ny = det.get_image_size()
         return (ny, nx)
 
-    def read_frame(self, ind, verbose=True, maskval=-1):
+    def read_frame(self, ind, maskval=-1):
         # for now, apply mask by default and return just the image as an ndarray
-        if verbose:
-            print(f"{self.__class__.__name__}: reading frame {ind}")
+        logger.debug(f"{self.__class__.__name__}: reading frame {ind}")
         im = self._iset.get_raw_data(ind)[0]
         msk = self._iset.get_mask(ind)[0]
         msk = ~msk
@@ -317,15 +319,14 @@ class ImageSet:
                 stop = min(start + buffer, nframes)
                 target_array[start:stop, :, :] = self.read_stack(start, stop)
 
-    def read_all_parallel(self, target_array, buffer=1, nproc=1, verbose=True):
+    def read_all_parallel(self, target_array, buffer=1, nproc=1):
         def nxswriter(q):
             while True:
                 val = q.get()
                 if val is None:
                     break
                 start, stop, arr = val  # unpack the tuple
-                if verbose:
-                    print(f"{self.__class__.__name__}: writing block to nexus file: {start}-{stop}")
+                logger.info(f"{self.__class__.__name__}: writing block to nexus file: {start}-{stop}")
                 target_array[start:stop, :, :] = arr
                 q.task_done()
             # Finish up
