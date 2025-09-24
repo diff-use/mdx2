@@ -571,7 +571,15 @@ class ImageSeries:
             signal = NXfield(self.data, name="data")
         return NXdata(signal=signal, axes=[phi, iy, ix], exposure_times=self.exposure_times)
 
-    def save(self, filename, name="image_series", virtual=False, source_template="{prefix}_{index}{ext}", **kwargs):
+    def save(
+        self,
+        filename,
+        name="image_series",
+        virtual=False,
+        source_template="{prefix}_{index}{ext}",
+        source_directory=None,
+        **kwargs,
+    ):
         """Save to nexus file
 
         If virtual=True, save the data as a virtual dataset, with each slab of images along the phi axis
@@ -585,6 +593,9 @@ class ImageSeries:
             files = [
                 source_template.format(prefix=prefix, name=name, index=index, ext=ext) for index in range(len(slices))
             ]
+            if source_directory is not None:
+                files = [os.path.join(source_directory, f) for f in files]
+                os.makedirs(source_directory, exist_ok=True)
             data_path = f"/entry/{name}/data"
             layout = h5py.VirtualLayout(shape=self.data.shape, dtype=self.data.dtype)
 
