@@ -22,7 +22,9 @@ class Parameters:
     """Options for importing x-ray image data"""
 
     expt: str = field(positional=True)  # experiments file, such as from dials.import
-    chunks: Optional[tuple[int, int, int]] = field(default=None, help="chunking for compression (frames, y, x)")
+    chunks: Optional[tuple[int, int, int]] = field(
+        default=None, help="chunking for compression (frames, y, x). Use -1 for default"
+    )
     outfile: str = "data.nxs"  # name of the output NeXus file
     nproc: int = 1  # number of parallel processes
     datastore: Optional[str] = None  # folder for storing source datasets
@@ -48,7 +50,11 @@ def run_import_data(params):
 
     if chunks is not None:
         # override the default chunking
-        image_series.data.chunks = tuple(chunks)
+        # if any of the chunks dimensions is <=0, use the default for that dimension
+        default_chunks = image_series.data.chunks
+        chunks = tuple(c if c > 0 else d for c, d in zip(chunks, default_chunks))
+        image_series.data.chunks = chunks
+        logger.info(f"Using chunking {chunks} for data compression")
 
     if datastore is None:
         saveobj(image_series, outfile, name="image_series")
