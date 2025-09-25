@@ -5,6 +5,7 @@ from multiprocessing import JoinableQueue, Process
 import numpy as np
 from cctbx.eltbx import attenuation_coefficient
 from dxtbx import flumpy
+from dxtbx.format.FormatPilatusHelpers import _get_pad_module_gap
 from dxtbx.model.experiment_list import ExperimentList
 from joblib import Parallel, delayed
 from scitbx import matrix
@@ -50,16 +51,10 @@ class Experiment:
 
     @property
     def panel_offset(self):
-        """offset in pixels (stride) of successive panels in the image file
-
-        These offsets are estimated from the rectangular mask elements covering
-        the panel gaps, and may fail in cases where non-default masks are used.
-        """
-        # TODO: test for non-default masks or other conditions that could cause this to fail
-        # TODO: fall back on tabulated values (e.g. using the detector name or image size as lookup)
-        m = np.array(list(self._panel.get_mask()))
-        row_size = m[m[:, 0] == 0, 3].min()
-        col_size = m[m[:, 1] == 0, 2].min()
+        """offset in pixels (stride) of successive panels in the image file"""
+        d = _get_pad_module_gap((self._panel,))
+        row_size = d.module_size_slow + d.gap_slow
+        col_size = d.module_size_fast + d.gap_fast
         return row_size, col_size
 
     @property
