@@ -348,7 +348,8 @@ class ImageSet:
 
 
 def calc_rotation_matrix_at_phi(goniometer, phi_vals_deg):
-    assert goniometer.num_scan_points == 0  # scan varying settings not implemented here
+    if goniometer.num_scan_points != 0:
+        raise NotImplementedError("scan-varying goniometer not supported here")
     # get the S matrix
     S = goniometer.get_setting_rotation()
     S = np.array(S).reshape([3, 3])
@@ -377,14 +378,17 @@ def interp_rotation_matrices(U1, U2, rotation_fraction):
 
 
 def calc_U_matrix_at_phi(crystal, scan, phi_vals_deg):
-    assert crystal.num_scan_points > 0  # use for a scan-varying model only
-    base, frac = phi_to_base_fraction_index(scan, phi_vals_deg)
-    U = np.empty([np.size(base), 3, 3])
-    for ind, (b, f) in enumerate(zip(base, frac)):
-        U1 = crystal.get_U_at_scan_point(b)
-        U2 = crystal.get_U_at_scan_point(b + 1)
-        Uvals = interp_rotation_matrices(U1, U2, f)
-        U[ind, :, :] = np.array(Uvals).reshape(3, 3)
+    if crystal.num_scan_points == 0:
+        U = np.array(crystal.get_U()).reshape(3, 3)
+        U = np.tile(U, (np.size(phi_vals_deg), 1, 1))
+    else:
+        base, frac = phi_to_base_fraction_index(scan, phi_vals_deg)
+        U = np.empty([np.size(base), 3, 3])
+        for ind, (b, f) in enumerate(zip(base, frac)):
+            U1 = crystal.get_U_at_scan_point(b)
+            U2 = crystal.get_U_at_scan_point(b + 1)
+            Uvals = interp_rotation_matrices(U1, U2, f)
+            U[ind, :, :] = np.array(Uvals).reshape(3, 3)
     return U
 
 
@@ -414,13 +418,16 @@ def phi_to_base_fraction_index(scan, phi_vals_deg):
 
 
 def calc_B_matrix_at_phi(crystal, scan, phi_vals_deg):
-    assert crystal.num_scan_points > 0  # use for a scan-varying model only
-    base, frac = phi_to_base_fraction_index(scan, phi_vals_deg)
-    B = np.empty([np.size(base), 3, 3])
-    for ind, (b, f) in enumerate(zip(base, frac)):
-        B1 = np.array(crystal.get_B_at_scan_point(b)).reshape([3, 3])
-        B2 = np.array(crystal.get_B_at_scan_point(b + 1)).reshape([3, 3])
-        B[ind, :, :] = B1 * (1 - f) + B2 * f  # element-wise linear interpolation
+    if crystal.num_scan_points == 0:
+        B = np.array(crystal.get_B()).reshape(3, 3)
+        B = np.tile(B, (np.size(phi_vals_deg), 1, 1))
+    else:
+        base, frac = phi_to_base_fraction_index(scan, phi_vals_deg)
+        B = np.empty([np.size(base), 3, 3])
+        for ind, (b, f) in enumerate(zip(base, frac)):
+            B1 = np.array(crystal.get_B_at_scan_point(b)).reshape([3, 3])
+            B2 = np.array(crystal.get_B_at_scan_point(b + 1)).reshape([3, 3])
+            B[ind, :, :] = B1 * (1 - f) + B2 * f  # element-wise linear interpolation
     return B
 
 
