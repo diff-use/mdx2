@@ -2,13 +2,17 @@
 Apply corrections to integrated data
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
 from simple_parsing import ArgumentParser, field  # pip install simple-parsing
 
+from mdx2.command_line import configure_logging
 from mdx2.utils import loadobj, saveobj
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -135,6 +139,7 @@ def run_correct(params):
 
 def run(args=None):
     """Run the correct script"""
+    configure_logging(filename="mdx2.correct.log")
     params = parse_arguments(args=args)
     run_correct(params)
 

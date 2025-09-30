@@ -2,6 +2,7 @@
 Integrate counts in an image stack on a Miller index grid
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
@@ -9,12 +10,15 @@ import numpy as np
 from joblib import Parallel, delayed
 from simple_parsing import ArgumentParser, field
 
+from mdx2.command_line import configure_logging
 from mdx2.data import HKLTable
 from mdx2.utils import (
     loadobj,
     nxload,  # mask is too big to read all at once?
     saveobj,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -123,6 +127,7 @@ def run_integrate(params):
 
 def run(args=None):
     """Run the integrate script"""
+    configure_logging(filename="mdx2.integrate.log")
     params = parse_arguments(args=args)
     run_integrate(params)
 
