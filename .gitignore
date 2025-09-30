@@ -1,6 +1,9 @@
 # example data
 docs/examples/data/
 
+# folder for playing around
+sandbox/
+
 # osx junk
 .DS_Store
 
