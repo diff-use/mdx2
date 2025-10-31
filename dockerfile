@@ -20,7 +20,7 @@ COPY env.yaml .
 
 # Use micromamba to create the environment and install packages
 RUN /usr/local/bin/micromamba create -f env.yaml -n mdx2-dev && \
-    /usr/local/bin/micromamba install -y -n mdx2-dev nexpy jupyterlab dials xia2 wget tar -c conda-forge && \
+    /usr/local/bin/micromamba install -y -n mdx2-dev nexpy jupyterlab jupyterlab-h5web dials xia2 wget tar -c conda-forge && \
     /usr/local/bin/micromamba clean --all --yes
 
 COPY . .
