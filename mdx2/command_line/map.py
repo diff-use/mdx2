@@ -5,7 +5,6 @@ Create a map from data in an hkl table
 import argparse
 
 import numpy as np
-import pandas as pd
 
 from mdx2.data import HKLTable
 from mdx2.geometry import GridData
@@ -23,7 +22,7 @@ def parse_arguments():
     # Required arguments
     parser.add_argument("geom", help="NeXus file with symmetry and crystal")
     parser.add_argument("hkl", help="NeXus file with hkl_table")
-    parser.add_argument("--symmetry", default=True, metavar="TF", help="apply symmetry operators?")
+    parser.add_argument("--symmetry", default="True", metavar="TF", help="apply symmetry operators?")
     parser.add_argument(
         "--limits",
         default=[0, 10, 0, 10, 0, 10],
@@ -82,12 +81,9 @@ def run(args=None):
 
     print(f"looking up {args.signal} in data table")
     # lookup in the table
-    df = T.to_frame().set_index(["h", "k", "l"])
-    dfgrid = Tgrid.to_frame().set_index(["h", "k", "l"])
-    dfgrid = pd.merge(dfgrid, df[signal], sort=False, on=["h", "k", "l"], how="left")
+    data = T.lookup(Tgrid.h, Tgrid.k, Tgrid.l, signal).reshape(h.shape)
 
     print("preparing output array")
-    data = dfgrid[signal].to_numpy().reshape(h.shape)
     G = GridData((h_axis, k_axis, l_axis), data, axes_names=["h", "k", "l"])
     saveobj(G, args.outfile, name=signal, append=False)
 
