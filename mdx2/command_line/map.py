@@ -23,7 +23,7 @@ def parse_arguments():
     # Required arguments
     parser.add_argument("geom", help="NeXus file with symmetry and crystal")
     parser.add_argument("hkl", help="NeXus file with hkl_table")
-    parser.add_argument("--symmetry", default=True, metavar="TF", help="apply symmetry operators?")
+    parser.add_argument("--symmetry", default="True", metavar="TF", help="apply symmetry operators?")
     parser.add_argument(
         "--limits",
         default=[0, 10, 0, 10, 0, 10],
