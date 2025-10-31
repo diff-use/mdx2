@@ -210,6 +210,64 @@ class HKLTable:
         data = {key: nxgroup[key].nxdata for key in data_keys}
         return HKLTable(h, k, l, **data)
 
+    def lookup(self, h, k, l, column_name, fill_value=np.nan):
+        """Lookup values from table using h,k,l indices
+
+        Parameters
+        ----------
+        h, k, l : array_like
+            Miller indices (floats) to lookup
+        column_name : str
+            Name of column to return values from
+        fill_value : scalar, optional
+            Value to use for missing indices (default: np.nan)
+
+        Returns
+        -------
+        values : ndarray
+            Array of values with same shape as h,k,l inputs
+        """
+        # Convert inputs to integer indices
+        H_query = np.round(np.asarray(h) * self.ndiv[0]).astype(np.int32)
+        K_query = np.round(np.asarray(k) * self.ndiv[1]).astype(np.int32)
+        L_query = np.round(np.asarray(l) * self.ndiv[2]).astype(np.int32)
+
+        # Get integer indices from table
+        H_table = self.H
+        K_table = self.K
+        L_table = self.L
+
+        # Create structured arrays for lexicographic sorting
+        dt = np.dtype([("h", np.int32), ("k", np.int32), ("l", np.int32)])
+
+        table_structured = np.empty(len(self), dtype=dt)
+        table_structured["h"] = H_table
+        table_structured["k"] = K_table
+        table_structured["l"] = L_table
+
+        query_structured = np.empty(H_query.size, dtype=dt)
+        query_structured["h"] = H_query.ravel()
+        query_structured["k"] = K_query.ravel()
+        query_structured["l"] = L_query.ravel()
+
+        # Sort table
+        sort_idx = np.argsort(table_structured)
+        table_sorted = table_structured[sort_idx]
+        values_sorted = self[column_name][sort_idx]
+
+        # Find matches using searchsorted
+        indices = np.searchsorted(table_sorted, query_structured)
+
+        # Handle out of bounds
+        indices = np.clip(indices, 0, len(table_sorted) - 1)
+
+        # Check for exact matches
+        matches = table_sorted[indices] == query_structured
+        result = np.where(matches, values_sorted[indices], fill_value)
+
+        # Reshape to original shape
+        return result.reshape(H_query.shape)
+
 
 class ImageSeries:
     """Image stack resulting from single sweep of data"""
