@@ -5,7 +5,6 @@ Create a map from data in an hkl table
 import argparse
 
 import numpy as np
-import pandas as pd
 
 from mdx2.data import HKLTable
 from mdx2.geometry import GridData
