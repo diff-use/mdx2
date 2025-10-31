@@ -82,12 +82,9 @@ def run(args=None):
 
     print(f"looking up {args.signal} in data table")
     # lookup in the table
-    df = T.to_frame().set_index(["h", "k", "l"])
-    dfgrid = Tgrid.to_frame().set_index(["h", "k", "l"])
-    dfgrid = pd.merge(dfgrid, df[signal], sort=False, on=["h", "k", "l"], how="left")
+    data = T.lookup(Tgrid.h, Tgrid.k, Tgrid.l, signal).reshape(h.shape)
 
     print("preparing output array")
-    data = dfgrid[signal].to_numpy().reshape(h.shape)
     G = GridData((h_axis, k_axis, l_axis), data, axes_names=["h", "k", "l"])
     saveobj(G, args.outfile, name=signal, append=False)
 
