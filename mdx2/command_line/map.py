@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Tuple
 
 import numpy as np
-import pandas as pd
 from simple_parsing import ArgumentParser, field
 
 from mdx2.command_line import configure_logging
