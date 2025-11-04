@@ -45,6 +45,9 @@ repository = "https://github.com/diff-use/mdx2"
 [tool.setuptools.dynamic]
 version = {file = "mdx2/VERSION"}
 
+[tool.setuptools.packages.find]
+include = ["mdx2", "mdx2.*"]
+
 [tool.ruff]
 line-length = 120
 indent-width = 4
