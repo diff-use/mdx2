@@ -1,13 +1,11 @@
 import logging
 import re
-from multiprocessing import JoinableQueue, Process
 
 import numpy as np
 from cctbx.eltbx import attenuation_coefficient
 from dxtbx import flumpy
 from dxtbx.format.FormatPilatusHelpers import _get_pad_module_gap
 from dxtbx.model.experiment_list import ExperimentList
-from joblib import Parallel, delayed
 from scitbx import matrix
 
 logger = logging.getLogger(__name__)
@@ -302,44 +300,6 @@ class ImageSet:
             stack.append(self.read_frame(ind))
 
         return np.stack(stack)
-
-    def read_all(self, target_array, buffer=1):
-        nframes = self.num_frames
-
-        if buffer == 1:
-            for start in range(0, nframes):
-                target_array[start, :, :] = self.read_frame(start)
-        else:
-            for start in range(0, nframes, buffer):
-                stop = min(start + buffer, nframes)
-                target_array[start:stop, :, :] = self.read_stack(start, stop)
-
-    def read_all_parallel(self, target_array, buffer=1, nproc=1):
-        def nxswriter(q):
-            while True:
-                val = q.get()
-                if val is None:
-                    break
-                start, stop, arr = val  # unpack the tuple
-                logger.info(f"{self.__class__.__name__}: writing block to nexus file: {start}-{stop}")
-                target_array[start:stop, :, :] = arr
-                q.task_done()
-            # Finish up
-            q.task_done()
-
-        q = JoinableQueue(maxsize=2)
-        writeprocess = Process(target=nxswriter, args=(q,))
-        writeprocess.start()
-
-        nframes = self.num_frames
-        with Parallel(n_jobs=nproc) as parallel:
-            for start in range(0, nframes, buffer):
-                stop = min(start + buffer, nframes)
-                res = parallel(delayed(self.read_frame)(ind) for ind in range(start, stop))
-                q.put((start, stop, np.stack(res)))
-        q.put(None)  # Poison pill
-        q.join()
-        writeprocess.join()
 
 
 def calc_rotation_matrix_at_phi(goniometer, phi_vals_deg):
