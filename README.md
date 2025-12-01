@@ -1,28 +1,26 @@
 <!--[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10519719.svg)](https://doi.org/10.5281/zenodo.10519719)-->
 
 > [!NOTE]
-> This is a fork of [ando-lab/mdx2](https://github.com/ando-lab/mdx2), intended for active development by [The Diffuse Project](https://diffuse.science) 
+> This is a fork of [ando-lab/mdx2](https://github.com/ando-lab/mdx2), intended for active development by [The Diffuse Project](https://github.com/ando-lab/mdx2) 
 
 # *mdx2*: macromolecular diffuse scattering data reduction in python
 
-## Manuscripts
+## References
 
-*Mdx2* is based on algorithms and general philosophy of the MATLAB library [mdx-lib](https://github.com/ando-lab/mdx-lib). The methods are described in the following publications:
+Publications describing [ando-lab/mdx2](https://github.com/ando-lab/mdx2):
 
 - Meisburger SP & Ando N. Scaling and merging macromolecular diffuse scattering with *mdx2*. Acta Cryst. D**80**, 299-313. [DOI](https://doi.org/10.1107/S2059798324002705)
 - Meisburger SP & Ando N. Chapter Two - Processing macromolecular diffuse scattering data. In *Methods in Enzymology* Volume **688**, 43-86. [DOI](https://doi.org/10.1016/bs.mie.2023.06.010), [BioRxiv](https://www.biorxiv.org/content/10.1101/2023.06.04.543637v1)
-- Meisburger SP, Case DA & Ando N. Diffuse X-ray scattering from correlated motions in a protein crystal. *Nature Communications* **11**, 1271 (2020). [DOI](https://doi.org/10.1038/s41467-020-14933-6)
 
+*Mdx2* is based on algorithms and general philosophy of [ando-lab/mdx-lib](https://github.com/ando-lab/mdx-lib), described here:
+
+- Meisburger SP, Case DA & Ando N. Diffuse X-ray scattering from correlated motions in a protein crystal. *Nature Communications* **11**, 1271 (2020). [DOI](https://doi.org/10.1038/s41467-020-14933-6)
+- Meisburger SP, Case DA, & Ando N. Robust total X-ray scattering workflow to study correlated motion of proteins in crystals. *Nature Communications* **14**, 1228 (2023). [DOI](https://doi.org/10.1038/s41467-023-36734-3)
 
 ## Examples
 
-### Insulin tutorial
-
-A introductory walkthrough is included. See [examples/insulin-tutorial](examples/insulin-tutorial/README.md) for instructions.
-
-### Multi-crystal scaling
-
-Scripts to process and analyze the multi-crystal insulin dataset from Meisburger & Ando 2024 are provided in [examples/insulin-multi-crystal](examples/insulin-multi-crystal).
+- Introductory walkthrough using a small insulin dataset: [examples/insulin-tutorial](examples/insulin-tutorial/README.md)
+- Scripts and notebooks to regenerate the figures from Meisburger & Ando, Acta Cryst. D (2024): [examples/insulin-multi-crystal](examples/insulin-multi-crystal).
 
 ## Versions
 
@@ -42,44 +40,32 @@ Scripts to process and analyze the multi-crystal insulin dataset from Meisburger
     - Symmetry operators now rotate in the correct direction
     - Gracefully skip missing or masked data chunks
 
-### Version 1.0.1
-
-- MIT license
-
-### Version 1.0.0
-
-New:
-- Implementation of the full scaling model from mdx-lib
-- Scale and merge multi-sweep datasets
-- Parallel processing
-- Improved handling of systematic absences
-- Example scripts and jupyter notebooks for multi-crystal data
-
-### Version 0.3.0
-
-Features:
-- pip-installable via setup.py
-- fully-featured command-line interface
-- import geometry from *dials*
-- read and write objects to nexus-formatted h5 files
-- support for basic masking, integration, background subtraction, scaling, and merging
-- construct 2D slices and 3D maps with symmetry expansion
-- convert h,k,l tables to/from Pandas DataFrame
-
-Limitations:
-- single sweep datasets only (one experiment per expt file)
-- not parallelized
-- scaling model includes phi-dependent term only
-- file format details will likely change in future releases
-
 ## Installation
 
-### Using micromamba
+### Prerequisites
 
-Install [micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html).
+For a conda-based installation, you'll need [micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) or equivalent.
+
+### User install (conda environment)
 
 ```bash
 micromamba create -f https://raw.githubusercontent.com/diff-use/mdx2/main/env.yaml
 micromamba activate mdx2
 pip install git+https://github.com/diff-use/mdx2
+```
+
+You'll probably want these packages too:
+
+```bash
+micromamba install -c conda-forge dials nexpy jupyterlab xia2
+```
+
+### Developer install (conda environment)
+
+```bash
+git clone https://github.com/diff-use/mdx2.git
+cd mdx2
+micromamba create -f env.yaml -n mdx2-dev
+micromamba activate mdx2-dev
+pip install -e .
 ```
