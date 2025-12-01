@@ -23,6 +23,14 @@ Scripts to process and analyze the multi-crystal insulin dataset from Meisburger
 
 ## Versions
 
+### Version 1.0.3
+
+- Performance boost for `mdx2.import_data` using parallel read and write. The `data.nxs` file contains a virtual dataset linking to neXus files in a subdirectory (`datastore/` by default).
+- `mdx2.reintegrate` -- New command-line tool to create fine maps after scaling (single-sweep only: multi-crystal datasets not yet implemented)
+- Optional pre-scaling in `mdx2.scale` to correct anisotropic background
+- Improved handling of command-line arguments via `dataclass` attributes and `simpleparsing` package
+- Updated examples
+
 ### Version 1.0.2
 
 - Rudimentary Bragg peak integration, in development
