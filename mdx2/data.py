@@ -704,19 +704,13 @@ class ImageSeries:
             if peaks.size:
                 return peaks
 
-        if nproc == 1:
-            peaklist = []
-            for ind, sl in enumerate(self.chunk_slice_iterator()):
-                peaks = peaksearch(sl)
-                if peaks is not None:
-                    logger.info(f"found {peaks.size} peaks in chunk {ind}")
-                    peaklist.append(peaks)
-            peaks = Peaks.stack(peaklist)
-        else:
-            with Parallel(n_jobs=nproc, verbose=10) as parallel:
-                peaklist = parallel(delayed(peaksearch)(sl) for sl in self.chunk_slice_iterator())
-            peaks = Peaks.stack([p for p in peaklist if p is not None])
+        with Parallel(n_jobs=nproc, verbose=10) as parallel:
+            peaklist = parallel(delayed(peaksearch)(sl) for sl in self.chunk_slice_iterator())
+
+        peaks = Peaks.stack([p for p in peaklist if p is not None])
+
         logger.info(f"found {peaks.size} peaks in total")
+
         return peaks
 
     def index(self, miller_index, mask=None):
