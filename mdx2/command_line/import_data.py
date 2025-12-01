@@ -12,7 +12,7 @@ from simple_parsing import ArgumentParser, field
 from mdx2.command_line import configure_logging
 from mdx2.data import ImageSeries
 from mdx2.dxtbx_machinery import ImageSet
-from mdx2.utils import nxload, saveobj
+from mdx2.utils import nxload
 
 logger = logging.getLogger(__name__)
 
@@ -56,32 +56,22 @@ def run_import_data(params):
         image_series.data.chunks = chunks
         logger.info(f"Using chunking {chunks} for data compression")
 
-    if datastore is None:
-        saveobj(image_series, outfile, name="image_series")
+    nxobj = image_series.save(
+        outfile,
+        virtual=True,
+        source_directory=datastore,
+    )
 
-        nbatches = image_series.data.chunks[0]
+    def write_stack(istart, istop, filename, datapath):
+        source = nxload(filename, "r+")[datapath]
+        data = iset.read_stack(istart, istop)
+        source[:, :, :] = data
 
-        if nproc == 1:
-            iset.read_all(image_series.data, nbatches)
-        else:
-            iset.read_all_parallel(image_series.data, nbatches, nproc)
-    else:  # use a virtual NXfield linking to source files in datastore/
-        nxobj = image_series.save(
-            outfile,
-            virtual=True,
-            source_directory=datastore,
-        )
+    slices = [sl for sl in image_series.chunk_slice_along_axis(0)]
+    files = nxobj.data._vfiles
 
-        def write_stack(istart, istop, filename, datapath):
-            source = nxload(filename, "r+")[datapath]
-            data = iset.read_stack(istart, istop)
-            source[:, :, :] = data
-
-        slices = [sl for sl in image_series.chunk_slice_along_axis(0)]
-        files = nxobj.data._vfiles
-
-        with Parallel(n_jobs=nproc, verbose=10) as parallel:
-            parallel(delayed(write_stack)(sl.start, sl.stop, fn, nxobj.data._vpath) for sl, fn in zip(slices, files))
+    with Parallel(n_jobs=nproc, verbose=10) as parallel:
+        parallel(delayed(write_stack)(sl.start, sl.stop, fn, nxobj.data._vpath) for sl, fn in zip(slices, files))
 
 
 def run(args=None):
