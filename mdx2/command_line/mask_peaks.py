@@ -70,15 +70,10 @@ def run_mask_peaks(params):
     # loop over phi values
     print(f"masking peaks with sigma above threshold: {sigma_cutoff}")
 
-    if nproc == 1:
-        for ind, sl in enumerate(IS.chunk_slice_iterator()):
-            print(f"indexing chunk {ind}")
-            mask[sl] = maskchunk(sl)
-    else:
-        with Parallel(n_jobs=nproc, verbose=10) as parallel:
-            masklist = parallel(delayed(maskchunk)(sl) for sl in IS.chunk_slice_iterator())
-        for msk, sl in zip(masklist, IS.chunk_slice_iterator()):
-            mask[sl] = msk  # <-- note, this copy step could be avoided with shared mem
+    with Parallel(n_jobs=nproc, verbose=10) as parallel:
+        masklist = parallel(delayed(maskchunk)(sl) for sl in IS.chunk_slice_iterator())
+    for msk, sl in zip(masklist, IS.chunk_slice_iterator()):
+        mask[sl] = msk  # <-- note, this copy step could be avoided with shared mem
 
     if bragg:
         print("inverting mask to retain Bragg peaks")
