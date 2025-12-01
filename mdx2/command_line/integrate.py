@@ -78,15 +78,8 @@ def run_integrate(params):
         tab.ndiv = ndiv
         return tab.bin(count_name="pixels")
 
-    if nproc == 1:
-        T = []  # list of tables
-        print("Looping through chunks")
-        for ind, sl in enumerate(IS.chunk_slice_iterator()):
-            T.append(intchunk(sl))
-            print(f"  binned chunk {ind}")
-    else:
-        with Parallel(n_jobs=nproc, verbose=10) as parallel:
-            T = parallel(delayed(intchunk)(sl) for sl in IS.chunk_slice_iterator())
+    with Parallel(n_jobs=nproc, verbose=10) as parallel:
+        T = parallel(delayed(intchunk)(sl) for sl in IS.chunk_slice_iterator())
 
     print(f"Summing partial observations over {len(T)} chunks")
     df = HKLTable.concatenate(T).to_frame()  # .set_index(['h','k','l'])
