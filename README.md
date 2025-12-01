@@ -1,5 +1,8 @@
 <!--[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10519719.svg)](https://doi.org/10.5281/zenodo.10519719)-->
 
+> [!NOTE]
+> This is a fork of [ando-lab/mdx2](https://github.com/ando-lab/mdx2), intended for active development by [The Diffuse Project](https://diffuse.science) 
+
 # *mdx2*: macromolecular diffuse scattering data reduction in python
 
 ## Manuscripts
