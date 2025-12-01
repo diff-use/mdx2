@@ -27,7 +27,7 @@ class Parameters:
     )
     outfile: str = "data.nxs"  # name of the output NeXus file
     nproc: int = 1  # number of parallel processes
-    datastore: Optional[str] = None  # folder for storing source datasets
+    datastore: str = "datastore"  # folder for storing source datasets
 
 
 def parse_arguments(args=None):
