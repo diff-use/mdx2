@@ -2,7 +2,7 @@
 
 This example reproduces the data processing and analysis described here:
 
-> Meisburger, S.P., and Ando, N. Scaling and merging macromolecular diffuse scattering with *mdx2*. [In preparation] (2024).
+> Meisburger SP & Ando N. Scaling and merging macromolecular diffuse scattering with *mdx2*. Acta Cryst. D**80**, 299-313. [DOI](https://doi.org/10.1107/S2059798324002705)
 
 ## Download the raw data
 

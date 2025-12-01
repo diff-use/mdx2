@@ -1,6 +1,6 @@
 # Data processing tutorial: insulin
 
-This tutorial demonstrates the essential steps of reciprocal space mapping with [mdx2](https://github.com/ando-lab/mdx2) on a small dataset from cubic insulin.
+This tutorial demonstrates the essential steps of reciprocal space mapping with `mdx2` on a small dataset from cubic insulin.
 
 The tutorial is based on the [data processing workshop](https://github.com/ando-lab/erice-2022-data-reduction) at the [2022 Erice School on Diffuse Scattering](https://crystalerice.org/2022/programme_ds.php) and it accompanies a chapter on data processing in the forthcoming Methods in Enzymology volume "Crystallography of Protein Dynamics”.
 
@@ -21,7 +21,7 @@ Install [micromamba](https://mamba.readthedocs.io/en/latest/installation/microma
 The following will create the `conda` environment with the minimal dependencies for `mdx2`:
 
 ```bash
-micromamba create -f https://raw.githubusercontent.com/ando-lab/mdx2/main/env.yaml
+micromamba create -f https://raw.githubusercontent.com/diff-use/mdx2/main/env.yaml
 ```
 
 Answer yes (`Y`) when prompted.
@@ -31,7 +31,7 @@ Next, activate the environment and install `dials`, `nexpy`, `jupyter lab`, and 
 ```bash
 micromamba activate mdx2
 micromamba install -c conda-forge dials nexpy jupyterlab
-pip install git+https://github.com/ando-lab/mdx2.git
+pip install git+https://github.com/diff-use/mdx2
 ```
 
 Answer yes (`Y`) when prompted.

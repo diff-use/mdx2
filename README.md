@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10519719.svg)](https://doi.org/10.5281/zenodo.10519719)
+<!--[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10519719.svg)](https://doi.org/10.5281/zenodo.10519719)-->
 
 # *mdx2*: macromolecular diffuse scattering data reduction in python
 
@@ -71,17 +71,12 @@ Limitations:
 
 ## Installation
 
-### Using conda (for introductory tutorial)
-
-Install version 0.3.0 using conda: see [examples/insulin-tutorial](examples/insulin-tutorial/README.md) for detailed instructions.
-
-### Using micromamba (for latest version)
+### Using micromamba
 
 Install [micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html).
 
 ```bash
-curl -O https://raw.githubusercontent.com/ando-lab/mdx2/main/env.yaml
-micromamba create -f env.yaml
+micromamba create -f https://raw.githubusercontent.com/diff-use/mdx2/main/env.yaml
 micromamba activate mdx2
-pip install git+https://github.com/ando-lab/mdx2.git
+pip install git+https://github.com/diff-use/mdx2
 ```
