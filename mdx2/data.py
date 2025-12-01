@@ -522,15 +522,8 @@ class ImageSeries:
                     outslab[ind_y, ind_x] = val
             return outslab
 
-        if nproc == 1:
-            slabs = []
-            for ind, sl in enumerate(sl_0):
-                logger.info(f"binning frames {sl.start} to {sl.stop - 1}")
-                slabs.append(binslab(sl))
-            new_data = np.stack(slabs)
-        else:
-            with Parallel(n_jobs=nproc, verbose=10) as parallel:
-                new_data = np.stack(parallel(delayed(binslab)(sl) for sl in sl_0))
+        with Parallel(n_jobs=nproc, verbose=10) as parallel:
+            new_data = np.stack(parallel(delayed(binslab)(sl) for sl in sl_0))
 
         if count_rate:
             new_times = np.array([self.exposure_times[sl].mean() for sl in sl_0])
