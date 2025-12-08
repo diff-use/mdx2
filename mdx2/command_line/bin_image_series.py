@@ -24,8 +24,8 @@ class Parameters:
 
     data: str = field(positional=True)  # NeXus data file containing the image_series
     bins: Tuple[int, int, int] = field(positional=True)  # number per bin in each direction (frames, y, x)
-    mask: Optional[str]  # name of NeXus file containing the mask
-    valid_range: Optional[Tuple[int, int]]  # minimum and maximum valid data values
+    mask: Optional[str] = None  # name of NeXus file containing the mask
+    valid_range: Optional[Tuple[int, int]] = None  # minimum and maximum valid data values
     outfile: str = "binned.nxs"  # name of the output NeXus file
     nproc: int = 1  # number of parallel processes
 
