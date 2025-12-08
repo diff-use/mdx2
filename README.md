@@ -29,7 +29,7 @@ Publications describing [ando-lab/mdx2](https://github.com/ando-lab/mdx2):
 - Performance boost for `mdx2.import_data` using parallel read and write. The `data.nxs` file contains a virtual dataset linking to neXus files in a subdirectory (`datastore/` by default).
 - `mdx2.reintegrate` -- New command-line tool to create fine maps after scaling (single-sweep only: multi-crystal datasets not yet implemented)
 - Optional pre-scaling in `mdx2.scale` to correct anisotropic background
-- Improved handling of command-line arguments via `dataclass` attributes and `simpleparsing` package
+- Improved handling of command-line arguments via `dataclass` attributes and `simple-parsing` package
 - Updated examples
 
 ### Version 1.0.2
