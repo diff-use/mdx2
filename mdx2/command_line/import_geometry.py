@@ -2,7 +2,6 @@
 Import experimental geometry using the dxtbx machinery
 """
 
-import sys
 from dataclasses import dataclass
 
 from loguru import logger
@@ -67,7 +66,7 @@ def run_import_geometry(params):
 def run(args=None):
     """Run the import geometry script"""
     params = parse_arguments(args=args)
-    logger.info("running mdx2.import_geometry with parameters: %s", params)
+    logger.info(params)
     run_import_geometry(params)
 
 

@@ -93,7 +93,7 @@ def run_mask_peaks(params):
 def run(args=None):
     """Run the mask peaks script"""
     params = parse_arguments(args=args)
-    logger.info("running mdx2.mask_peaks with parameters: %s", params)
+    logger.info(params)
     run_mask_peaks(params)
 
 

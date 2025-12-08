@@ -200,7 +200,7 @@ def run_merge(params):
 def run(args=None):
     """Run the merge script"""
     params = parse_arguments(args=args)
-    logger.info("running mdx2.merge with parameters: %s", params)
+    logger.info(params)
     run_merge(params)
 
 

@@ -92,7 +92,7 @@ def run_map(params):
 def run(args=None):
     """Run the map script"""
     params = parse_arguments(args=args)
-    logger.info("running mdx2.map with parameters: %s", params)
+    logger.info(params)
     run_map(params)
 
 

@@ -76,7 +76,7 @@ def run_import_data(params):
 def run(args=None):
     """Run the import data script"""
     params = parse_arguments(args=args)
-    logger.info("running mdx2.import_data with parameters: %s", params)
+    logger.info(params)
     run_import_data(params)
 
 

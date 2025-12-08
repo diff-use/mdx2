@@ -65,7 +65,7 @@ def run_bin_image_series(params):
 def run(args=None):
     """Run the binning script"""
     params = parse_arguments(args=args)
-    logger.info("running mdx2.bin_image_series with parameters: %s", params)
+    logger.info(params)
     run_bin_image_series(params)
 
 

@@ -76,7 +76,7 @@ def run_find_peaks(params):
 def run(args=None):
     """Run the find peaks script"""
     params = parse_arguments(args=args)
-    logger.info("running mdx2.find_peaks with parameters: %s", params)
+    logger.info(params)
     run_find_peaks(params)
 
 

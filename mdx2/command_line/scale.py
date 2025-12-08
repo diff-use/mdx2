@@ -417,7 +417,7 @@ def run_scale(params):
 def run(args=None):
     """Run the scale script"""
     params = parse_arguments(args=args)
-    logger.info("running mdx2.scale with parameters: %s", params)
+    logger.info(params)
     run_scale(params)
 
 

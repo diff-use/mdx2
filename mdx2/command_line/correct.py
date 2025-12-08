@@ -139,7 +139,7 @@ def run_correct(params):
 def run(args=None):
     """Run the correct script"""
     params = parse_arguments(args=args)
-    logger.info("running mdx2.correct with parameters: %s", params)
+    logger.info(params)
     run_correct(params)
 
 

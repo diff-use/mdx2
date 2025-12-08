@@ -1,6 +1,8 @@
 """Common utilities for command-line tools"""
 
 import sys
+import time
+from datetime import datetime
 from functools import wraps
 
 from loguru import logger
@@ -21,23 +23,37 @@ def with_logging(log_filename=None, log_level="INFO"):
             # Remove default handler
             logger.remove()
 
-            # Determine log filename
+            # Determine log filename and module name
             if log_filename is None:
                 module_name = func.__module__.split(".")[-1]
                 logfile = f"mdx2.{module_name}.log"
             else:
                 logfile = log_filename
+                module_name = func.__module__.split(".")[-1]
 
-            # Add file and stderr handlers
-            logger.add(logfile, level=log_level)
-            logger.add(sys.stderr, level=log_level)
+            # File format: detailed with full timestamp, NO color tags for plain text
+            file_format = "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}"
+
+            # Stderr format: streamlined with fixed-width time and level, WITH colors
+            stderr_format = "<green>{time:HH:mm:ss}</green> <level>{level: <7}</level> | <level>{message}</level>"
+
+            # Add handlers with different formats
+            logger.add(logfile, level=log_level, format=file_format, colorize=False)
+            logger.add(sys.stderr, level=log_level, format=stderr_format, colorize=True)
+
+            # Log start with full timestamp and module name
+            start_time = time.time()
+            start_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            logger.info(f"Starting mdx2.{module_name} at {start_datetime}")
 
             try:
                 result = func(args)
-                logger.success("done")
+                elapsed = time.time() - start_time
+                logger.success(f"mdx2.{module_name} completed in {elapsed:.2f} seconds")
                 return result
             except Exception as e:
-                logger.error(f"Error: {e}")
+                elapsed = time.time() - start_time
+                logger.error(f"mdx2.{module_name} failed after {elapsed:.2f} seconds: {e}")
                 raise
 
         return wrapper
