@@ -19,7 +19,7 @@ class Parameters:
     """Options for importing experimental geometry"""
 
     expt: str = field(positional=True)  # dials experiments file, such as refined.expt
-    sample_spacing: tuple[int, int, int] = (1, 10, 10)  # inverval in degrees or pixels (phi, iy, ix)
+    sample_spacing: tuple[int, int, int] = (1, 10, 10)  # interval in degrees or pixels (phi, iy, ix)
     outfile: str = "geometry.nxs"  # name of the output NeXus file
 
 
