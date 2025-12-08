@@ -21,6 +21,32 @@ class Experiment:
         self._scan = expt.scan
         self._beam = expt.beam
 
+        # check compatibility
+        try:
+            # Check that we have exactly one panel
+            if len(expt.detector) != 1:
+                raise RuntimeError(
+                    f"Experiment detector has {len(expt.detector)} panels; mdx2 requires single-panel detectors"
+                )
+
+            # Check that the panel type is SENSOR_PAD
+            if self._panel.get_type() != "SENSOR_PAD":
+                raise RuntimeError(
+                    f"Experiment detector type is '{self._panel.get_type()}'; mdx2 requires SENSOR_PAD detectors"
+                )
+
+            # Check that the detector is in the known database
+            d = _get_pad_module_gap((self._panel,))
+            if d is None:
+                raise RuntimeError(
+                    "Experiment detector geometry not found in dxtbx detector database; "
+                    "mdx2 may not be compatible with this detector type"
+                )
+        except (AssertionError, RuntimeError) as e:
+            raise RuntimeError(f"Experiment detector not compatible with mdx2: {e}") from e
+        except Exception as e:
+            raise RuntimeError(f"Unexpected error checking detector compatibility: {e}") from e
+
     @staticmethod
     def from_file(exptfile):
         elist = ExperimentList.from_file(exptfile)
