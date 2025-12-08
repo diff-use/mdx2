@@ -139,6 +139,9 @@ def run_reintegrate(params):
     hkl_table.k = hkl_table.k.astype(np.float32)
     hkl_table.l = hkl_table.l.astype(np.float32)
     if params.output == "intensity":
+        zero_scale_mask = hkl_table.scale == 0
+        if np.any(zero_scale_mask):
+            logger.warning(f"Found {np.sum(zero_scale_mask)} voxels with zero scale; intensity will be inf/nan")
         hkl_table.intensity = (hkl_table.counts - hkl_table.background_counts) / hkl_table.scale
         hkl_table.intensity_error = np.sqrt(hkl_table.counts) / hkl_table.scale
         del hkl_table.counts, hkl_table.background_counts, hkl_table.scale
