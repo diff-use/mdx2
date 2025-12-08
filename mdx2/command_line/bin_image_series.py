@@ -2,20 +2,18 @@
 Bin down an image stack
 """
 
-import logging
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+from loguru import logger
 from simple_parsing import ArgumentParser, field
 
-from mdx2.command_line import configure_logging
+from mdx2.command_line import with_logging
 from mdx2.utils import (
     loadobj,
     nxload,  # mask is too big to read all at once?
     saveobj,
 )
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -63,10 +61,11 @@ def run_bin_image_series(params):
     nxs = saveobj(binned, outfile, name="binned_image_series")
 
 
+@with_logging()
 def run(args=None):
     """Run the binning script"""
-    configure_logging(filename="mdx2.bin_image_series.log")
     params = parse_arguments(args=args)
+    logger.info("running mdx2.bin_image_series with parameters: %s", params)
     run_bin_image_series(params)
 
 

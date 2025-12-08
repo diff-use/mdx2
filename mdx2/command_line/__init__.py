@@ -1,25 +1,45 @@
-import logging
+"""Common utilities for command-line tools"""
+
+import sys
+from functools import wraps
+
+from loguru import logger
 
 
-def configure_logging(filename=None, level=logging.INFO):
-    """Configure logging to console and optionally to a file."""
+def with_logging(log_filename=None, log_level="INFO"):
+    """
+    Decorator to set up logging for command-line tools.
 
-    handlers = []
+    Args:
+        log_filename: Name of log file. If None, uses module name.
+        log_level: Logging level (default: INFO)
+    """
 
-    if filename is not None:
-        # configure the logger
-        file_handler = logging.FileHandler(filename)
-        file_formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-        file_handler.setFormatter(file_formatter)
-        file_handler.setLevel(level)
-        handlers.append(file_handler)
+    def decorator(func):
+        @wraps(func)
+        def wrapper(args=None):
+            # Remove default handler
+            logger.remove()
 
-    # Console handler: simple format (message only)
-    console_handler = logging.StreamHandler()
-    console_formatter = logging.Formatter("%(message)s")
-    console_handler.setFormatter(console_formatter)
-    console_handler.setLevel(level)
-    handlers.append(console_handler)
+            # Determine log filename
+            if log_filename is None:
+                module_name = func.__module__.split(".")[-1]
+                logfile = f"mdx2.{module_name}.log"
+            else:
+                logfile = log_filename
 
-    # Configure root logger
-    logging.basicConfig(level=level, handlers=handlers)
+            # Add file and stderr handlers
+            logger.add(logfile, level=log_level)
+            logger.add(sys.stderr, level=log_level)
+
+            try:
+                result = func(args)
+                logger.success("done")
+                return result
+            except Exception as e:
+                logger.error(f"Error: {e}")
+                raise
+
+        return wrapper
+
+    return decorator

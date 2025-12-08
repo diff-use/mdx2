@@ -1,14 +1,12 @@
 import importlib
-import logging
 
 import numpy as np
+from loguru import logger
 from nexusformat.nexus import NXentry, NXgroup, NXroot, NXvirtualfield
 from nexusformat.nexus import nxload as nexus_nxload
 from scipy.ndimage import map_coordinates
 
 import mdx2
-
-logger = logging.getLogger(__name__)
 
 # FUNCTIONS FOR LOADING AND SAVING MDX2 CLASSES TO NEXUS FILES
 
@@ -19,7 +17,7 @@ def _patch_virtualfields(g):
         for entry in g.entries.values():
             _patch_virtualfields(entry)
     elif isinstance(g, NXvirtualfield):
-        logger.info(f"patching virtual field: {g.nxpath}")
+        logger.debug(f"patching virtual field: {g.nxpath}")
         with g.nxfile as f:
             g._shape = f.get(g.nxpath).shape
 
@@ -46,7 +44,6 @@ def loadobj(filename, objectname):
     # simple wrapper to load mdx2 objects from nxs files
     # handles import using the mdx2_module and mdx2_class attributes
     # does a from_nexus() call to instantiate the class
-    logger.info(f"Reading {objectname} from {filename}")
     nxroot = nxload(filename, "r")
     mdx2_version_file = nxroot.attrs.get("mdx2_version")
     if mdx2_version_file != mdx2.__version__:
@@ -56,18 +53,17 @@ def loadobj(filename, objectname):
     cls = nxs.attrs["mdx2_class"]
     _tmp = importlib.__import__(mod, fromlist=[cls])
     Class = getattr(_tmp, cls)
-    logger.info(f"  importing as {cls} from {mod}")
+    logger.info(f"Loading {objectname} from {filename} as {mod}.{cls}")
     return Class.from_nexus(nxs)
 
 
 def saveobj(obj, filename, name=None, append=False, mode="w"):
     # simple wrapper to save mdx2 objects as nxs files
     #
-    logger.info(f"Exporting {type(obj)} to nexus object")
     nxsobj = obj.to_nexus()
     if name is not None:
         nxsobj.rename(name)
-    logger.info(f"  writing {nxsobj.nxname} to {filename}")
+    logger.info(f"Saving {nxsobj.nxname} ({type(obj)}) to {filename}")
     nxsobj.attrs["mdx2_module"] = type(obj).__module__
     nxsobj.attrs["mdx2_class"] = type(obj).__name__
     if append:

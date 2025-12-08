@@ -2,18 +2,16 @@
 Find and analyze peaks in an image stack
 """
 
-import logging
 from dataclasses import dataclass
 
 import numpy as np
+from loguru import logger
 from simple_parsing import ArgumentParser, field  # pip install simple-parsing
 
-from mdx2.command_line import configure_logging
+from mdx2.command_line import with_logging
 from mdx2.data import Peaks
 from mdx2.geometry import GaussianPeak
 from mdx2.utils import loadobj, saveobj
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -74,10 +72,11 @@ def run_find_peaks(params):
     print("done!")
 
 
+@with_logging()
 def run(args=None):
     """Run the find peaks script"""
-    configure_logging(filename="mdx2.find_peaks.log")
     params = parse_arguments(args=args)
+    logger.info("running mdx2.find_peaks with parameters: %s", params)
     run_find_peaks(params)
 
 

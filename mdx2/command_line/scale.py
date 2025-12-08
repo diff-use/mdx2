@@ -2,19 +2,17 @@
 Fit scaling model to unmerged corrected intensities
 """
 
-import logging
 import os
 from dataclasses import dataclass
 
 import numpy as np
+from loguru import logger
 from simple_parsing import ArgumentGenerationMode, ArgumentParser, NestedMode, field
 
-from mdx2.command_line import configure_logging
+from mdx2.command_line import with_logging
 from mdx2.data import HKLTable
 from mdx2.scaling import BatchModelRefiner, ScaledData
 from mdx2.utils import loadobj, saveobj
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -415,10 +413,11 @@ def run_scale(params):
     print("done!")
 
 
+@with_logging()
 def run(args=None):
     """Run the scale script"""
-    configure_logging(filename="mdx2.scale.log")
     params = parse_arguments(args=args)
+    logger.info("running mdx2.scale with parameters: %s", params)
     run_scale(params)
 
 

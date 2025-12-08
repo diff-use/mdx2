@@ -2,19 +2,17 @@
 Create a map from data in an hkl table
 """
 
-import logging
 from dataclasses import dataclass
 from typing import Tuple
 
 import numpy as np
+from loguru import logger
 from simple_parsing import ArgumentParser, field
 
-from mdx2.command_line import configure_logging
+from mdx2.command_line import with_logging
 from mdx2.data import HKLTable
 from mdx2.geometry import GridData
 from mdx2.utils import loadobj, saveobj
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -90,10 +88,11 @@ def run_map(params):
     print("done!")
 
 
+@with_logging()
 def run(args=None):
     """Run the map script"""
-    configure_logging(filename="mdx2.map.log")
     params = parse_arguments(args=args)
+    logger.info("running mdx2.map with parameters: %s", params)
     run_map(params)
 
 

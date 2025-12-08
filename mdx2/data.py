@@ -1,4 +1,3 @@
-import logging
 import os
 from copy import deepcopy
 
@@ -6,13 +5,12 @@ import h5py
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
+from loguru import logger
 from nexusformat.nexus import NXdata, NXfield, NXgroup, NXreflections, NXvirtualfield
 
 from mdx2.dxtbx_machinery import Experiment
 from mdx2.geometry import GridData
 from mdx2.utils import nxload, saveobj, slice_sections
-
-logger = logging.getLogger(__name__)
 
 
 class Peaks:
@@ -664,7 +662,7 @@ class ImageSeries:
             # some kind of bug that I don't have time to track down right now.
             saveobj(self, filename, name=name, **kwargs)
 
-            logger.info(f"creating virtual dataset in {filename} from {len(files)} files")
+            logger.info(f"Creating virtual dataset in {filename} from {len(files)} files")
             with h5py.File(filename, "r+", libver="latest") as f:
                 del f[data_path]
                 f.create_virtual_dataset(data_path, layout, fillvalue=self._maskval)

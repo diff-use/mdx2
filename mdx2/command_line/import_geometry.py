@@ -2,16 +2,15 @@
 Import experimental geometry using the dxtbx machinery
 """
 
-import logging
+import sys
 from dataclasses import dataclass
 
+from loguru import logger
 from simple_parsing import ArgumentParser, field
 
 import mdx2.geometry as geom
-from mdx2.command_line import configure_logging
+from mdx2.command_line import with_logging
 from mdx2.utils import saveobj
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -63,13 +62,12 @@ def run_import_geometry(params):
     saveobj(corrections, outfile, name="corrections", append=True)
     saveobj(miller_index, outfile, name="miller_index", append=True)
 
-    print("done!")
 
-
+@with_logging()
 def run(args=None):
     """Run the import geometry script"""
-    configure_logging(filename="mdx2.import_geometry.log")
     params = parse_arguments(args=args)
+    logger.info("running mdx2.import_geometry with parameters: %s", params)
     run_import_geometry(params)
 
 

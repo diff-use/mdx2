@@ -1,4 +1,3 @@
-import logging
 import re
 
 import numpy as np
@@ -6,9 +5,8 @@ from cctbx.eltbx import attenuation_coefficient
 from dxtbx import flumpy
 from dxtbx.format.FormatPilatusHelpers import _get_pad_module_gap
 from dxtbx.model.experiment_list import ExperimentList
+from loguru import logger
 from scitbx import matrix
-
-logger = logging.getLogger(__name__)
 
 
 class Experiment:

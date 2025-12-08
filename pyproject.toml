@@ -20,6 +20,7 @@ dependencies = [
     "joblib",
     "numexpr",
     "simple-parsing",
+    "loguru",
 ]
 # dxtbx needs to be installed with conda
 

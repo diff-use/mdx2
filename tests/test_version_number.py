@@ -1,7 +1,9 @@
 import re
+from io import StringIO
 
 import h5py as h5
 import numpy as np
+from loguru import logger
 
 from mdx2 import __version__ as mdx2_version
 from mdx2.geometry import Crystal
@@ -38,7 +40,7 @@ def test_mdx2_utils_nxsave(tmp_path):
         assert f.attrs["mdx2_version"] == mdx2_version
 
 
-def test_mdx2_utils_nxload(tmp_path, caplog):
+def test_mdx2_utils_nxload(tmp_path):
     """check that mdx2.utils.nxload logs a warning if the version number does not match"""
 
     crystal = Crystal(
@@ -57,6 +59,13 @@ def test_mdx2_utils_nxload(tmp_path, caplog):
     with h5.File(filename, "a") as f:
         f.attrs["mdx2_version"] = "0.0.0"
 
-    # loading should now raise an error
-    _ = nxload(filename)
-    assert "mdx2 version mismatch" in caplog.text
+    # Capture loguru output
+    log_output = StringIO()
+    logger_id = logger.add(log_output, format="{message}")
+
+    try:
+        # loading should now log a warning
+        _ = nxload(filename)
+        assert "mdx2 version mismatch" in log_output.getvalue()
+    finally:
+        logger.remove(logger_id)

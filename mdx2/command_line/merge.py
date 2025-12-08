@@ -2,20 +2,18 @@
 Merge corrected intensities using a scaling model
 """
 
-import logging
 from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
+from loguru import logger
 from nexusformat.nexus import nxload
 from simple_parsing import ArgumentParser, field  # pip install simple-parsing
 
-from mdx2.command_line import configure_logging
+from mdx2.command_line import with_logging
 from mdx2.data import HKLTable
 from mdx2.scaling import BatchModelRefiner, ScaledData
 from mdx2.utils import loadobj, saveobj
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -198,10 +196,11 @@ def run_merge(params):
     print("done!")
 
 
+@with_logging()
 def run(args=None):
     """Run the merge script"""
-    configure_logging(filename="mdx2.merge.log")
     params = parse_arguments(args=args)
+    logger.info("running mdx2.merge with parameters: %s", params)
     run_merge(params)
 
 
