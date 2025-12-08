@@ -93,7 +93,7 @@ def run_correct(params):
     solid_angle = Cinterp["solid_angle"]
 
     if attenuation:
-        print("correctin solid angle for attenuation")
+        print("correcting solid angle for attenuation")
         solid_angle *= Cinterp["attenuation"]
     if efficiency:
         print("correcting solid angle for efficiency")
