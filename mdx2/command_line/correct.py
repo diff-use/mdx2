@@ -21,7 +21,7 @@ class Parameters:
 
     geom: str = field(positional=True)  # NeXus data file containing miller_index
     hkl: str = field(positional=True)  # NeXus data file containing hkl_table
-    background: Optional[str]  # NeXus file with background map
+    background: Optional[str] = None  # NeXus file with background map
     attenuation: bool = True  # apply attenuation correction
     efficiency: bool = True  # apply efficiency correction
     polarization: bool = True  # apply polarization correction
