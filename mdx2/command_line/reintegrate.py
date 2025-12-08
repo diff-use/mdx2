@@ -153,7 +153,7 @@ def run_reintegrate(params):
 
 
 def run(args=None):
-    """Run the correct script"""
+    """Run the reintegrate script"""
     configure_logging(filename="mdx2.reintegrate.log")
     params = parse_arguments(args=args)
     run_reintegrate(params)
