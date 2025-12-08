@@ -27,7 +27,7 @@ class Parameters:
 
     geom: str = field(positional=True)  # NeXus data file containing miller_index
     data: str = field(positional=True)  # NeXus data file containing image_series
-    mask: Optional[str]  # NeXus data file containing mask
+    mask: Optional[str] = None  # NeXus data file containing mask
     subdivide: Tuple[int, int, int] = (1, 1, 1)  # subdivisions of the Miller index grid
     max_spread: float = 1.0  # maximum angular spread (degrees) for binning partial observations
     nproc: int = 1  # number of parallel processes
