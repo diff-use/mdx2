@@ -200,6 +200,7 @@ def run_merge(params):
     # hkl_table = HKLTable.from_frame(df_merged)
     # hkl_table.ndiv = ndiv # lost in conversion to/from dataframe
 
+    logger.info("Saving merged data to {}...", outfile)
     saveobj(hkl_table, outfile, name="hkl_table", append=False)
     logger.info("Merge completed successfully")
 

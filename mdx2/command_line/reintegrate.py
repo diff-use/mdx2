@@ -238,6 +238,7 @@ def run_reintegrate(params):
         hkl_table.intensity = hkl_table.intensity.astype(np.float32)
         hkl_table.intensity_error = hkl_table.intensity_error.astype(np.float32)
 
+    logger.info("Saving reintegrated data to {}...", params.outfile)
     saveobj(hkl_table, params.outfile, name="hkl_table", append=False)
     logger.info("Reintegration completed successfully")
 

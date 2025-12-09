@@ -70,6 +70,7 @@ def run_import_geometry(params):
     unit_cell_rounded = [f"{round(x, 4):g}" for x in crystal.unit_cell]
     logger.info("Unit cell: {}", ", ".join(unit_cell_rounded))
 
+    logger.info("Saving geometry to {}...", outfile)
     saveobj(crystal, outfile, name="crystal", append=False)
     saveobj(symmetry, outfile, name="symmetry", append=True)
     saveobj(corrections, outfile, name="corrections", append=True)

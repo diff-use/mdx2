@@ -91,6 +91,7 @@ def run_find_peaks(params):
 
     Outliers = Peaks(P.phi[is_outlier], P.iy[is_outlier], P.ix[is_outlier])
 
+    logger.info("Saving peaks to {}...", outfile)
     saveobj(GP, outfile, name="peak_model", append=False)
     saveobj(P, outfile, name="peaks", append=True)
     saveobj(Outliers, outfile, name="outliers", append=True)

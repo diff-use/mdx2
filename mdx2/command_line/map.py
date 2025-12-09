@@ -81,6 +81,7 @@ def run_map(params):
     logger.info("Looking up '{}' values in data table...", signal)
     data = T.lookup(Tgrid.h, Tgrid.k, Tgrid.l, signal).reshape(h.shape)
 
+    logger.info("Saving map to {}...", outfile)
     G = GridData((h_axis, k_axis, l_axis), data, axes_names=["h", "k", "l"])
     saveobj(G, outfile, name=signal, append=False)
     logger.info("Map creation completed successfully")

@@ -85,6 +85,7 @@ def run_mask_peaks(params):
     masked_fraction = np.sum(mask) / mask.size
     logger.info("Masked pixels: {:.2%}", masked_fraction)
 
+    logger.info("Saving mask to {}...", outfile)
     maskobj = GridData((IS.phi, IS.iy, IS.ix), mask)
     saveobj(maskobj, outfile, name="mask", append=False)
     logger.info("Mask creation completed successfully")

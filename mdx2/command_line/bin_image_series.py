@@ -106,6 +106,7 @@ def run_bin_image_series(params):
     binned = GridData((new_phi, new_iy, new_ix), new_data, axes_names=["phi", "iy", "ix"])
     logger.info("Binned image shape: {}", binned.data.shape)
 
+    logger.info("Saving binned data to {}...", outfile)
     saveobj(binned, outfile, name="binned_image_series")
     logger.info("Binning completed successfully")
 

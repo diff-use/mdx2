@@ -1,20 +1,10 @@
 import importlib
+import warnings
 
-from loguru import logger
 from nexusformat.nexus import NXentry, NXgroup, NXroot, NXvirtualfield
 from nexusformat.nexus import nxload as nexus_nxload
 
 import mdx2
-
-# Configure default logging for this module when used outside command-line tools
-# Remove default handler and add a custom one with WARNING level and simplified format
-logger.remove()  # Remove default handler
-logger.add(
-    lambda msg: print(msg, end=""),  # Print to stderr (default behavior)
-    level="WARNING",
-    format="<level>{level}</level>: {message}\n",
-    colorize=True,
-)
 
 # FUNCTIONS FOR LOADING AND SAVING MDX2 CLASSES TO NEXUS FILES
 
@@ -25,7 +15,8 @@ def _patch_virtualfields(g):
         for entry in g.entries.values():
             _patch_virtualfields(entry)
     elif isinstance(g, NXvirtualfield):
-        logger.debug(f"patching virtual field: {g.nxpath}")
+        # Patch virtual field shape - this has been thoroughly tested but may need
+        # debugging if nexusformat package changes its internal handling of virtual datasets
         with g.nxfile as f:
             g._shape = f.get(g.nxpath).shape
 
@@ -35,7 +26,11 @@ def nxload(filename, mode="r", **kwargs):
     nxroot = nexus_nxload(filename, mode=mode, **kwargs)
     mdx2_version_file = nxroot.attrs.get("mdx2_version")
     if mdx2_version_file != mdx2.__version__:
-        logger.warning(f"mdx2 version mismatch: file version {mdx2_version_file}, installed version {mdx2.__version__}")
+        warnings.warn(
+            f"mdx2 version mismatch: file version {mdx2_version_file}, installed version {mdx2.__version__}",
+            UserWarning,
+            stacklevel=2
+        )
     _patch_virtualfields(nxroot)
     return nxroot
 
@@ -61,7 +56,6 @@ def loadobj(filename, objectname):
     cls = nxs.attrs["mdx2_class"]
     _tmp = importlib.__import__(mod, fromlist=[cls])
     Class = getattr(_tmp, cls)
-    logger.info(f"Loading {objectname} from {filename} as {mod}.{cls}")
     return Class.from_nexus(nxs)
 
 
@@ -72,7 +66,6 @@ def saveobj(obj, filename, name=None, append=False, mode="w"):
     nxsobj = obj.to_nexus()
     if name is not None:
         nxsobj.rename(name)
-    logger.info(f"Saving {nxsobj.nxname} ({type(obj)}) to {filename}")
     nxsobj.attrs["mdx2_module"] = type(obj).__module__
     nxsobj.attrs["mdx2_class"] = type(obj).__name__
     if append:

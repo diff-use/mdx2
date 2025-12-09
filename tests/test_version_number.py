@@ -1,9 +1,8 @@
 import re
-from io import StringIO
 
 import h5py as h5
 import numpy as np
-from loguru import logger
+import pytest
 
 from mdx2 import __version__ as mdx2_version
 from mdx2.geometry import Crystal
@@ -59,13 +58,6 @@ def test_mdx2_utils_nxload(tmp_path):
     with h5.File(filename, "a") as f:
         f.attrs["mdx2_version"] = "0.0.0"
 
-    # Capture loguru output
-    log_output = StringIO()
-    logger_id = logger.add(log_output, format="{message}")
-
-    try:
-        # loading should now log a warning
+    # loading should now issue a warning
+    with pytest.warns(UserWarning, match="mdx2 version mismatch"):
         _ = nxload(filename)
-        assert "mdx2 version mismatch" in log_output.getvalue()
-    finally:
-        logger.remove(logger_id)

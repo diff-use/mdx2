@@ -135,6 +135,7 @@ def run_correct(params):
     T.op = T.op.astype(np.int32)
 
     logger.info("Reflections processed: {}", len(T))
+    logger.info("Saving corrected data to {}...", outfile)
     saveobj(T, outfile, name="hkl_table", append=False)
     logger.info("Corrections completed successfully")
 
