@@ -3,7 +3,7 @@ Import x-ray image data using the dxtbx machinery
 """
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 from joblib import Parallel, delayed
 from loguru import logger
@@ -20,7 +20,7 @@ class Parameters:
     """Options for importing x-ray image data"""
 
     expt: str = field(positional=True)  # experiments file, such as from dials.import
-    chunks: Optional[tuple[int, int, int]] = field(
+    chunks: Optional[Tuple[int, int, int]] = field(
         default=None, help="chunking for compression (frames, y, x). Use -1 for default"
     )
     outfile: str = "data.nxs"  # name of the output NeXus file
@@ -69,6 +69,9 @@ def run_import_data(params):
         source[:, :, :] = data
 
     slices = [sl for sl in image_series.chunk_slice_along_axis(0)]
+    # NOTE: Accessing private h5py virtual dataset attributes (_vfiles, _vpath) exposed through
+    # nexusformat. These are implementation details that may change with h5py/nexusformat updates.
+    # This dependency should be validated when updating those packages.
     files = nxobj.data._vfiles
 
     logger.info("Writing {} image batches (requested n_jobs: {})...", len(slices), nproc)

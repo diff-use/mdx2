@@ -4,6 +4,7 @@ Fit scaling model to unmerged corrected intensities
 
 import os
 from dataclasses import dataclass
+from typing import List, Optional
 
 import numpy as np
 from loguru import logger
@@ -88,13 +89,13 @@ class AbsorptionModelParameters:
 class Parameters:
     """Options for refining a scaling model to unmerged corrected intensities"""
 
-    hkl: str = field(positional=True, nargs="+")  # NeXus file(s) containing hkl_table
+    hkl: List[str] = field(positional=True, nargs="+")  # NeXus file(s) containing hkl_table
     prescale: PrescaleParameters
     scaling: ScalingModelParameters
     absorption: AbsorptionModelParameters
     detector: DetectorModelParameters
     offset: OffsetModelParameters
-    outfile: str = field(nargs="*")
+    outfile: Optional[List[str]] = field(default=None, nargs="*")
     """name of the output NeXus file(s). If omitted, will attempt a sensible name such as scales.nxs"""
     mca2020: bool = False
     """shortcut for --scaling.enable True --offset.enable True --detector.enable True --absorption.enable True"""
@@ -115,7 +116,7 @@ def generate_default_outfiles(infiles):
         return [os.path.join(d, "scales.nxs") for d in dirs]
     if len(set(dirs)) == 1:  # dirs are identical
         roots = [os.path.splitext(os.path.split(fn)[-1])[0] for fn in infiles]
-        if all(["_" in root for root in roots]):
+        if all("_" in root for root in roots):
             postfix = [root.split("_")[-1] for root in roots]
             if len(set(postfix)) == len(postfix):  # postfixes are unique
                 return [os.path.join(dirs[0], f"scales_{pf}.nxs") for pf in postfix]
@@ -151,7 +152,7 @@ def mask_outliers(MR, outlier):
     logger.info("    Applying scale factors...")
     MR.apply()
     logger.info("    Merging...")
-    Im, sigmam, counts = MR.data.merge()
+    Im, _sigmam, _counts = MR.data.merge()
     nout = MR.data.mask_outliers(Im, outlier)
     logger.info("    Removed {} outliers (>{} sigma)", nout, outlier)
 
@@ -164,7 +165,7 @@ def refine_offset_model(MR, offset_params):
         logger.info("    Applying scale factors...")
         MR.apply()
         logger.info("    Merging...")
-        Im, sigmam, counts = MR.data.merge()
+        Im, _sigmam, _counts = MR.data.merge()
 
         logger.info("    Fitting the model...")
         x2 = MR.cfit(
@@ -189,7 +190,7 @@ def refine_scaling_model(MR, scaling_params):
         logger.info("    Applying scale factors...")
         MR.apply()
         logger.info("    Merging...")
-        Im, sigmam, counts = MR.data.merge()
+        Im, _sigmam, _counts = MR.data.merge()
         logger.info("    Fitting the model...")
         x2 = MR.bfit(Im, scaling_params.alpha)
         logger.info("    χ²: {:.6f}", x2)
@@ -207,7 +208,7 @@ def refine_scaling_and_offset_model(MR, scaling_params, offset_params):
         logger.info("    Applying scale factors...")
         MR.apply()
         logger.info("    Merging...")
-        Im, sigmam, counts = MR.data.merge()
+        Im, _sigmam, _counts = MR.data.merge()
         logger.info("    Fitting the model...")
         MR.cfit(
             Im,
@@ -232,7 +233,7 @@ def refine_detector_model(MR, detector_params):
         logger.info("    Applying scale factors...")
         MR.apply()
         logger.info("    Merging...")
-        Im, sigmam, counts = MR.data.merge()
+        Im, _sigmam, _counts = MR.data.merge()
         logger.info("    Fitting the model...")
         x2 = MR.dfit(Im, detector_params.alpha)
         logger.info("    χ²: {:.6f}", x2)
@@ -250,7 +251,7 @@ def refine_absorption_model(MR, absorption_params):
         logger.info("    Applying scale factors...")
         MR.apply()
         logger.info("    Merging...")
-        Im, sigmam, counts = MR.data.merge()
+        Im, _sigmam, _counts = MR.data.merge()
         logger.info("    Fitting the model...")
         x2 = MR.afit(Im, absorption_params.alpha_xy, absorption_params.alpha_z)
         logger.info("    χ²: {:.6f}", x2)

@@ -1,5 +1,5 @@
 """
-Create a peak mask for in an image stack
+Create a peak mask for an image stack
 """
 
 from dataclasses import dataclass

@@ -99,7 +99,7 @@ def run_bin_image_series(params):
         new_data = np.stack(parallel(delayed(binslab)(sl) for sl in sl_0))
     logger.info("Binning computation completed")
 
-    # Convert to count rate if requested
+    # Convert to count rate
     new_times = np.array([image_series.exposure_times[sl].mean() for sl in sl_0])
     new_data = new_data / new_times[:, np.newaxis, np.newaxis]
 
