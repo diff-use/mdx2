@@ -67,7 +67,8 @@ def loadobj(filename, objectname):
 
 def saveobj(obj, filename, name=None, append=False, mode="w"):
     # simple wrapper to save mdx2 objects as nxs files
-    #
+    if not hasattr(obj, 'to_nexus'):
+        raise TypeError(f"{type(obj).__name__} does not support Nexus serialization (missing to_nexus method)")
     nxsobj = obj.to_nexus()
     if name is not None:
         nxsobj.rename(name)
