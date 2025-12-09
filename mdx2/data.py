@@ -190,6 +190,9 @@ class HKLTable:
 
     @staticmethod
     def concatenate(tabs):
+        if not tabs:
+            raise ValueError("Cannot concatenate empty list of HKLTable objects")
+
         ndiv = tabs[0].ndiv  # assume the first one is canonical
         data_keys = set(tabs[0]._data_keys)
         for j in range(1, len(tabs)):

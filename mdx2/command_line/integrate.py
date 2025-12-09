@@ -85,6 +85,13 @@ def run_integrate(params):
         T = parallel(delayed(intchunk)(sl) for sl in slices)
 
     logger.info("Summing partial observations over {} chunks...", len(T))
+
+    # Handle empty results
+    if not T:
+        raise ValueError(
+            "No integration results produced. The image series may be empty, or no valid data was found to integrate."
+        )
+
     df = HKLTable.concatenate(T).to_frame()  # .set_index(['h','k','l'])
 
     df["tmp"] = df["phi"] / df["pixels"]
