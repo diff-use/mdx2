@@ -92,7 +92,7 @@ def run_bin_image_series(params):
         for ind_y, sl_y in enumerate(sl_1):  # not vectorized - could be slow?
             for ind_x, sl_x in enumerate(sl_2):
                 val = tmp[:, sl_y, sl_x].mean()
-                if isinstance(val, np.ma.masked_array):
+                if np.ma.is_masked(val):
                     val = np.nan
                 outslab[ind_y, ind_x] = val
         return outslab
