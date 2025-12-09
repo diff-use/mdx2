@@ -22,10 +22,12 @@ class Parameters:
 
     hkl: str = field(positional=True, nargs="+")  # NeXus file(s) containing hkl_table
     scale: str = field(nargs="+")  # NeXus file(s) with scaling models
-    outlier: Optional[float]  # optional standard error cutoff for outlier rejection
+    outlier: Optional[float] = None  # optional standard error cutoff for outlier rejection
     split: Optional[str] = field(choices=["randomHalf", "weightedRandomHalf", "Friedel"])
     """also merge data into separate columns based on splitting criteria"""
-    geometry: Optional[str]  # NeXus file containing the Laue group symmetry operators, required for --split Friedel
+    geometry: Optional[str] = (
+        None  # NeXus file containing the Laue group symmetry operators, required for --split Friedel
+    )
     outfile: str = "merged.nxs"  # name of the output NeXus file
     scaling: bool = field(default=True, negative_prefix="--no-")  # apply scaling model if present
     offset: bool = field(default=True, negative_prefix="--no-")  # apply offset model if present
