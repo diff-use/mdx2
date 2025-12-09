@@ -303,6 +303,18 @@ def test_mask_peaks_parse_arguments(args, expected, raises):
             None,
             SystemExit,  # argparse throws SystemExit on error
         ),
+        # Negative bin size
+        (
+            ["data.nxs", "-1", "50", "30", "--outfile", "binned_data.nxs", "--nproc", "4"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for negative bins
+        ),
+        # Zero bin size
+        (
+            ["data.nxs", "2", "0", "30", "--outfile", "binned_data.nxs", "--nproc", "4"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for zero bins
+        ),
     ],
 )
 def test_bin_image_series_parse_arguments(args, expected, raises):

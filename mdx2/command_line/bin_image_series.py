@@ -32,6 +32,12 @@ class Parameters:
     outfile: str = "binned.nxs"  # name of the output NeXus file
     nproc: int = 1  # number of parallel processes
 
+    def __post_init__(self):
+        """Validate bins parameter"""
+        for i, bin_size in enumerate(self.bins):
+            if bin_size <= 0:
+                raise ValueError(f"bins[{i}] must be positive, got {bin_size}")
+
 
 def parse_arguments(args=None):
     """Parse commandline arguments"""
