@@ -23,7 +23,7 @@ class Parameters:
     hkl: str = field(positional=True, nargs="+")  # NeXus file(s) containing hkl_table
     scale: str = field(nargs="+")  # NeXus file(s) with scaling models
     outlier: Optional[float] = None  # optional standard error cutoff for outlier rejection
-    split: Optional[str] = field(choices=["randomHalf", "weightedRandomHalf", "Friedel"])
+    split: Optional[str] = field(default=None, choices=["randomHalf", "weightedRandomHalf", "Friedel"])
     """also merge data into separate columns based on splitting criteria"""
     geometry: Optional[str] = (
         None  # NeXus file containing the Laue group symmetry operators, required for --split Friedel
