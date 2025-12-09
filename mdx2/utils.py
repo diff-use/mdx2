@@ -1,5 +1,47 @@
+import warnings
+
 import numpy as np
 from scipy.ndimage import map_coordinates
+
+
+# DEPRECATED: Import I/O functions for backward compatibility
+# These will be removed in a future version
+def _deprecated_import(name, new_module="mdx2.io"):
+    """Issue a deprecation warning when importing from utils instead of io"""
+    warnings.warn(
+        f"Importing '{name}' from mdx2.utils is deprecated and will be removed in a future version. "
+        f"Please import from {new_module} instead: 'from {new_module} import {name}'",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
+def __getattr__(name):
+    """Lazy import with deprecation warning for I/O functions"""
+    io_functions = ["nxload", "nxsave", "loadobj", "saveobj"]
+    if name in io_functions:
+        _deprecated_import(name)
+        from mdx2 import io
+
+        return getattr(io, name)
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+
+# Explicitly list what's available from this module for backwards compatibility
+__all__ = [
+    # Numerical functions (current)
+    "interp_g2g_bilinear",
+    "interp_g2g_trilinear",
+    "interp3",
+    "interp2",
+    "slice_sections",
+    # I/O functions (deprecated, imported from mdx2.io)
+    "nxload",
+    "nxsave",
+    "loadobj",
+    "saveobj",
+]
+
 
 # FUNCTIONS FOR EFFICIENT LINEAR INTERPOLATION
 
