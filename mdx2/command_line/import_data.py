@@ -43,8 +43,10 @@ def run_import_data(params):
     outfile = params.outfile
     datastore = params.datastore
 
+    logger.info("Loading experiment metadata...")
     image_series = ImageSeries.from_expt(exptfile)
     iset = ImageSet.from_file(exptfile)
+    logger.info("Image data shape (phi, iy, ix): {}", image_series.shape)
 
     if chunks is not None:
         # override the default chunking
@@ -52,8 +54,9 @@ def run_import_data(params):
         default_chunks = image_series.data.chunks
         chunks = tuple(c if c > 0 else d for c, d in zip(chunks, default_chunks))
         image_series.data.chunks = chunks
-        logger.info(f"Using chunking {chunks} for data compression")
+        logger.info("Using chunking: {}", chunks)
 
+    logger.info("Creating virtual dataset structure...")
     nxobj = image_series.save(
         outfile,
         virtual=True,
@@ -69,7 +72,16 @@ def run_import_data(params):
     files = nxobj.data._vfiles
 
     with Parallel(n_jobs=nproc, verbose=10) as parallel:
+        backend_name = parallel._backend.__class__.__name__
+        logger.info(
+            "Writing {} image batches using {} processes (backend: {})...",
+            len(slices),
+            nproc,
+            backend_name,
+        )
         parallel(delayed(write_stack)(sl.start, sl.stop, fn, nxobj.data._vpath) for sl, fn in zip(slices, files))
+
+    logger.info("Image data import completed successfully")
 
 
 @with_logging()

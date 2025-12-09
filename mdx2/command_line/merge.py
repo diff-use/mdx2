@@ -82,6 +82,7 @@ def run_merge(params):
     geometry = params.geometry
 
     # load data into a giant table
+    logger.info("Loading {} HKL table(s)...", len(hkl))
     tabs = []
 
     for n, fn in enumerate(hkl):
@@ -90,8 +91,9 @@ def run_merge(params):
         tabs.append(tmp)
 
     hkl = HKLTable.concatenate(tabs)
+    logger.info("Total reflections loaded: {}", len(hkl))
 
-    print("Grouping redundant observations")
+    logger.info("Grouping redundant observations...")
     (h, k, l), index_map, counts = hkl.unique()
 
     S = ScaledData(
@@ -108,6 +110,7 @@ def run_merge(params):
     MR = BatchModelRefiner(S)
 
     if scale is not None:
+        logger.info("Loading scaling models...")
         for fn, refiner in zip(scale, MR._batch_refiners):
             a = nxload(fn)
             if apply_absorption and ("absorption_model" in a.entry.keys()):
@@ -119,15 +122,15 @@ def run_merge(params):
             if apply_scaling and ("scaling_model" in a.entry.keys()):
                 refiner.scaling.model = loadobj(fn, "scaling_model")
 
-    print("applying scale factors")
+    logger.info("Applying scale factors...")
     MR.apply()
-    print("merging")
+    logger.info("Merging observations...")
     Im, sigmam, counts = MR.data.merge()
 
     if outlier is not None:
         nout = MR.data.mask_outliers(Im, outlier)
-        print(f"removed {nout} outliers > {outlier} sigma")
-        print("merging again")
+        logger.info("Removed {} outliers (>{} sigma)", nout, outlier)
+        logger.info("Merging again...")
         Im, sigmam, counts = MR.data.merge()
 
     cols = dict(
@@ -138,16 +141,16 @@ def run_merge(params):
 
     if split is not None:
         if split == "weightedRandomHalf":
-            print("Splitting according to the weighted random half algorithm")
+            logger.info("Splitting by weighted random half algorithm...")
             w = 1 / MR.data.sigma**2
             isgrp1 = wrs(index_map, w.filled(fill_value=0))
             groups = [isgrp1, ~isgrp1]
         elif split == "randomHalf":
-            print("Splitting into random half-datasets (unweighted)")
+            logger.info("Splitting into random half-datasets (unweighted)...")
             isgrp1 = wrs(index_map, np.ones_like(index_map))
             groups = [isgrp1, ~isgrp1]
         elif split == "Friedel":
-            print("Splitting into Friedel pairs")
+            logger.info("Splitting into Friedel pairs...")
             symm = loadobj(geometry, "symmetry")
             has_inversion = np.array([np.linalg.det(op) for op in symm.laue_group_operators]) < 0
             isminus = has_inversion[hkl.op]
@@ -157,7 +160,7 @@ def run_merge(params):
         for j, g in enumerate(groups):
             G = MR.data.copy()
             G.mask = G.mask | ~g
-            print(f"Merging group {j}")
+            logger.info("Merging group {}...", j)
             Imj, sigmamj, countsj = G.merge()
             cols[f"group_{j}_intensity"] = Imj.filled(fill_value=np.nan).astype(np.float32)
             cols[f"group_{j}_intensity_error"] = sigmamj.filled(fill_value=np.nan).astype(np.float32)
@@ -165,6 +168,7 @@ def run_merge(params):
 
     # create the output table object
     hkl_table = HKLTable(h, k, l, ndiv=hkl.ndiv, **cols)
+    logger.info("Unique reflections in merged output: {}", len(hkl_table))
 
     # ndiv = T.ndiv # save for later
 
@@ -192,8 +196,7 @@ def run_merge(params):
     # hkl_table.ndiv = ndiv # lost in conversion to/from dataframe
 
     saveobj(hkl_table, outfile, name="hkl_table", append=False)
-
-    print("done!")
+    logger.info("Merge completed successfully")
 
 
 @with_logging()

@@ -53,11 +53,14 @@ def parse_arguments(args=None):
 def run_reintegrate(params):
     # TODO: what if scaling models are missing from the nexus file?
 
+    logger.info("Loading geometry and image data...")
     miller_index = loadobj(params.geom, "miller_index")
     image_series = loadobj(params.data, "image_series")
     corrections = loadobj(params.geom, "corrections")
     crystal = loadobj(params.geom, "crystal")
     symmetry = loadobj(params.geom, "symmetry")
+
+    logger.info("Loading optional models...")
     background = loadobj(params.background, "binned_image_series") if params.background else None
     scaling_model = loadobj(params.scale, "scaling_model") if params.scale else None
     absorption_model = loadobj(params.scale, "absorption_model") if params.scale else None
@@ -107,13 +110,14 @@ def run_reintegrate(params):
 
     # TODO: check for memory limitations, consider using memory mapping for large datasets
 
-    print("calculating Miller index range for the output grid")
+    logger.info("Calculating Miller index range for output grid...")
     hkl = HKLTable(miller_index.h.ravel(), miller_index.k.ravel(), miller_index.l.ravel(), ndiv=params.subdivide)
     hkl = hkl.to_asu(symmetry)
     array_range = (min(hkl.H.min(), 0), hkl.H.max(), min(hkl.K.min(), 0), hkl.K.max(), min(hkl.L.min(), 0), hkl.L.max())
     array_size = tuple(r - l + 1 for l, r in zip(array_range[::2], array_range[1::2]))
     array_ori = tuple(l / s for l, s in zip(array_range[::2], params.subdivide))
-    print("allocating empty output arrays")
+    logger.info("Output grid size: {}", array_size)
+    logger.info("Allocating empty output arrays...")
     data_arrays = {
         "counts": np.zeros(array_size, dtype=np.uint32),
         "background_counts": np.zeros(array_size, dtype=np.float32),
@@ -122,23 +126,33 @@ def run_reintegrate(params):
     }
     grid = HKLGrid(data_arrays, ndiv=params.subdivide, ori=array_ori)
 
+    slices = list(image_series.chunk_slice_iterator())
     with Parallel(n_jobs=params.nproc, verbose=10, return_as="generator_unordered") as parallel:
-        slices = list(image_series.chunk_slice_iterator())
+        backend_name = parallel._backend.__class__.__name__
+        logger.info(
+            "Reintegrating {} image chunks using {} processes (backend: {})...",
+            len(slices),
+            params.nproc,
+            backend_name,
+        )
         tab_chunk = parallel(delayed(intchunk)(sl) for sl in slices)
         for tab in tab_chunk:
             if tab is None:
                 continue
             grid.accumulate_from_table(tab, resize=False)
 
-    print(f"Saving table of integrated data to {params.outfile}")
+    logger.info("Converting grid to sparse table...")
     hkl_table = grid.to_table(sparse=True)
     hkl_table.h = hkl_table.h.astype(np.float32)
     hkl_table.k = hkl_table.k.astype(np.float32)
     hkl_table.l = hkl_table.l.astype(np.float32)
+    logger.info("Reflections in output: {}", len(hkl_table))
+
     if params.output == "intensity":
+        logger.info("Computing intensities from counts...")
         zero_scale_mask = hkl_table.scale == 0
         if np.any(zero_scale_mask):
-            logger.warning(f"Found {np.sum(zero_scale_mask)} voxels with zero scale; intensity will be inf/nan")
+            logger.warning("Found {} voxels with zero scale; intensity will be inf/nan", np.sum(zero_scale_mask))
         hkl_table.intensity = (hkl_table.counts - hkl_table.background_counts) / hkl_table.scale
         hkl_table.intensity_error = np.sqrt(hkl_table.counts) / hkl_table.scale
         del hkl_table.counts, hkl_table.background_counts, hkl_table.scale
@@ -146,7 +160,7 @@ def run_reintegrate(params):
         hkl_table.intensity_error = hkl_table.intensity_error.astype(np.float32)
 
     saveobj(hkl_table, params.outfile, name="hkl_table", append=False)
-    print("done!")
+    logger.info("Reintegration completed successfully")
 
 
 @with_logging()

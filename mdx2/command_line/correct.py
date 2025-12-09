@@ -48,6 +48,7 @@ def run_correct(params):
     polarization = params.polarization
     lorentz = params.lorentz
 
+    logger.info("Loading integrated data and geometry...")
     T = loadobj(hkl, "hkl_table")
 
     # hack to work with older versions
@@ -59,24 +60,22 @@ def run_correct(params):
     Crystal = loadobj(geom, "crystal")
 
     if p1:
-        print("ignoring space group information and using P1 symmetry only")
+        logger.info("Using P1 symmetry only (ignoring space group)")
         Symmetry = None
     else:
         Symmetry = loadobj(geom, "symmetry")
 
     UB = Crystal.ub_matrix
 
-    # computing scattering vector magnitude
-    print("calculating scattering vector magnitude (s)")
+    logger.info("Calculating scattering vector magnitudes...")
     s = UB @ np.stack((T.h, T.k, T.l))
     T.s = np.sqrt(np.sum(s * s, axis=0))
 
-    # map h,k,l to asymmetric unit
-    print("mapping Miller indices to the asymmetric unit")
+    logger.info("Mapping Miller indices to asymmetric unit...")
     T = T.to_asu(Symmetry)
 
     # apply corrections to intensities
-
+    logger.info("Interpolating correction factors...")
     Cinterp = Corrections.interpolate(T.iy, T.ix)
 
     count_rate = T.counts / T.seconds
@@ -85,29 +84,34 @@ def run_correct(params):
     if background is not None:
         Bkg = loadobj(background, "binned_image_series")
         bkg_count_rate = Bkg.interpolate(T.phi, T.iy, T.ix)
-        print("subtracting background from count rate")
+        logger.info("Subtracting background from count rate")
         count_rate = count_rate - bkg_count_rate
 
     solid_angle = Cinterp["solid_angle"]
 
+    corrections_applied = []
     if attenuation:
-        print("correcting solid angle for attenuation")
         solid_angle *= Cinterp["attenuation"]
+        corrections_applied.append("attenuation")
     if efficiency:
-        print("correcting solid angle for efficiency")
         solid_angle *= Cinterp["efficiency"]
+        corrections_applied.append("efficiency")
     if polarization:
-        print("correcting solid angle for polarization")
         solid_angle *= Cinterp["polarization"]
+        corrections_applied.append("polarization")
 
-    print("computing the swept reciprocal space volume fraction (rs_volume)")
+    if corrections_applied:
+        logger.info("Applied corrections: {}", ", ".join(corrections_applied))
+
+    logger.info("Computing reciprocal space volume fractions...")
     T.rs_volume = T.pixels * Cinterp["d3s"] / np.linalg.det(UB)
 
-    print("computing intensity and intensity_error")
+    logger.info("Computing intensities and errors...")
     T.intensity = count_rate / solid_angle
     T.intensity_error = count_rate_error / solid_angle
 
     if lorentz:
+        logger.info("Applying Lorentz correction")
         T.intensity *= T.rs_volume
         T.intensity_error *= T.rs_volume
 
@@ -130,9 +134,9 @@ def run_correct(params):
     T.n = T.n.astype(np.int32)
     T.op = T.op.astype(np.int32)
 
+    logger.info("Reflections processed: {}", len(T))
     saveobj(T, outfile, name="hkl_table", append=False)
-
-    print("done!")
+    logger.info("Corrections completed successfully")
 
 
 @with_logging()

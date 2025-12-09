@@ -36,30 +36,38 @@ def run_import_geometry(params):
     spacing_px = spacing_phi_px[1:]
     outfile = params.outfile
 
-    print("Computing miller index lookup grid")
+    logger.info("Computing miller index lookup grid...")
     miller_index = geom.MillerIndex.from_expt(
         exptfile,
         sample_spacing=spacing_phi_px,
     )
+    logger.info(
+        "Miller index grid shape (phi, iy, ix, hkl): {}",
+        miller_index.data.shape,
+    )
 
-    print("Computing geometric correction factors")
+    logger.info("Computing geometric correction factors...")
     corrections = geom.Corrections.from_expt(
         exptfile,
         sample_spacing=spacing_px,
     )
+    logger.info(
+        "Correction factors grid shape (iy, ix, factors): {}",
+        corrections.data.shape,
+    )
 
-    print("Gathering space group info")
+    logger.info("Gathering crystal symmetry and unit cell...")
     symmetry = geom.Symmetry.from_expt(exptfile)
-
-    print("Gathering unit cell info")
     crystal = geom.Crystal.from_expt(exptfile)
-
-    print(f"Saving geometry to {outfile}")
+    logger.info("Space group: {}", symmetry.space_group_symbol)
+    unit_cell_rounded = [f"{round(x, 4):g}" for x in crystal.unit_cell]
+    logger.info("Unit cell: {}", ", ".join(unit_cell_rounded))
 
     saveobj(crystal, outfile, name="crystal", append=False)
     saveobj(symmetry, outfile, name="symmetry", append=True)
     saveobj(corrections, outfile, name="corrections", append=True)
     saveobj(miller_index, outfile, name="miller_index", append=True)
+    logger.info("Geometry saved successfully")
 
 
 @with_logging()

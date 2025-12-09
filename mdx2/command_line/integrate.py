@@ -50,6 +50,7 @@ def run_integrate(params):
     max_degrees = params.max_spread
     maskfile = params.mask
 
+    logger.info("Loading geometry and image data...")
     MI = loadobj(geom, "miller_index")
     IS = loadobj(data, "image_series")
 
@@ -76,10 +77,18 @@ def run_integrate(params):
         tab.ndiv = ndiv
         return tab.bin(count_name="pixels")
 
+    slices = list(IS.chunk_slice_iterator())
     with Parallel(n_jobs=nproc, verbose=10) as parallel:
-        T = parallel(delayed(intchunk)(sl) for sl in IS.chunk_slice_iterator())
+        backend_name = parallel._backend.__class__.__name__
+        logger.info(
+            "Integrating {} image chunks using {} processes (backend: {})...",
+            len(slices),
+            nproc,
+            backend_name,
+        )
+        T = parallel(delayed(intchunk)(sl) for sl in slices)
 
-    print(f"Summing partial observations over {len(T)} chunks")
+    logger.info("Summing partial observations over {} chunks...", len(T))
     df = HKLTable.concatenate(T).to_frame()  # .set_index(['h','k','l'])
 
     df["tmp"] = df["phi"] / df["pixels"]
@@ -94,9 +103,9 @@ def run_integrate(params):
     df["iy"] = df["iy"] / df["pixels"]
     df["ix"] = df["ix"] / df["pixels"]
 
-    print(f"  binned from {np.sum([len(t) for t in T])} to {len(df)} voxels")
-
-    print(f"Saving table of integrated data to {outfile}")
+    voxels_before = np.sum([len(t) for t in T])
+    voxels_after = len(df)
+    logger.info("Binned from {} to {} voxels", voxels_before, voxels_after)
 
     hkl_table = HKLTable.from_frame(df)
     hkl_table.ndiv = ndiv  # lost in conversion to/from dataframe
@@ -112,8 +121,7 @@ def run_integrate(params):
     hkl_table.pixels = hkl_table.pixels.astype(np.int32)
 
     saveobj(hkl_table, outfile, name="hkl_table", append=False)
-
-    print("done!")
+    logger.info("Integration completed successfully")
 
 
 @with_logging()

@@ -48,6 +48,7 @@ def run_map(params):
     signal = params.signal
     hmin, hmax, kmin, kmax, lmin, lmax = params.limits
 
+    logger.info("Loading HKL table and geometry...")
     T = loadobj(hkl, "hkl_table")
     Symmetry = loadobj(geom, "symmetry")  # used only if symmetry flag is set
     ndiv = T.ndiv
@@ -63,29 +64,26 @@ def run_map(params):
     k_axis = np.arange(Kmin, Kmax + 1) / ndiv[1]
     l_axis = np.arange(Lmin, Lmax + 1) / ndiv[2]
 
-    print("map region:")
-    print(f"  h from {h_axis[0]} to {h_axis[-1]} ({h_axis.size} grid points)")
-    print(f"  k from {k_axis[0]} to {k_axis[-1]} ({k_axis.size} grid points)")
-    print(f"  l from {l_axis[0]} to {l_axis[-1]} ({l_axis.size} grid points)")
+    logger.info("Map region:")
+    logger.info("  h: {} to {} ({} points)", h_axis[0], h_axis[-1], h_axis.size)
+    logger.info("  k: {} to {} ({} points)", k_axis[0], k_axis[-1], k_axis.size)
+    logger.info("  l: {} to {} ({} points)", l_axis[0], l_axis[-1], l_axis.size)
 
-    print("generating Miller index array")
+    logger.info("Generating Miller index grid...")
     h, k, l = np.meshgrid(h_axis, k_axis, l_axis, indexing="ij")
 
     Tgrid = HKLTable(h.ravel(), k.ravel(), l.ravel(), ndiv=ndiv)
 
     if apply_symmetry:
-        print("mapping Miller indices to asymmetric unit")
+        logger.info("Mapping Miller indices to asymmetric unit...")
         Tgrid = Tgrid.to_asu(Symmetry)
 
-    print(f"looking up {signal} in data table")
-    # lookup in the table
+    logger.info("Looking up '{}' values in data table...", signal)
     data = T.lookup(Tgrid.h, Tgrid.k, Tgrid.l, signal).reshape(h.shape)
 
-    print("preparing output array")
     G = GridData((h_axis, k_axis, l_axis), data, axes_names=["h", "k", "l"])
     saveobj(G, outfile, name=signal, append=False)
-
-    print("done!")
+    logger.info("Map creation completed successfully")
 
 
 @with_logging()

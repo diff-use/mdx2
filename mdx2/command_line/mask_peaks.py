@@ -45,6 +45,7 @@ def run_mask_peaks(params):
     nproc = params.nproc
     bragg = params.bragg
 
+    logger.info("Loading geometry, image data, and peak model...")
     MI = loadobj(geom, "miller_index")
     Symm = loadobj(geom, "symmetry")
     IS = loadobj(data, "image_series")
@@ -65,28 +66,32 @@ def run_mask_peaks(params):
         isrefl = Symm.is_reflection(H, K, L)
         return isrefl & GP.mask(dh, dk, dl, sigma_cutoff=sigma_cutoff)
 
-    # loop over phi values
-    print(f"masking peaks with sigma above threshold: {sigma_cutoff}")
-
+    slices = list(IS.chunk_slice_iterator())
     with Parallel(n_jobs=nproc, verbose=10) as parallel:
-        masklist = parallel(delayed(maskchunk)(sl) for sl in IS.chunk_slice_iterator())
+        backend_name = parallel._backend.__class__.__name__
+        logger.info(
+            "Computing peak mask for {} image chunks using {} processes (backend: {})...",
+            len(slices),
+            nproc,
+            backend_name,
+        )
+        masklist = parallel(delayed(maskchunk)(sl) for sl in slices)
     for msk, sl in zip(masklist, IS.chunk_slice_iterator()):
         mask[sl] = msk  # <-- note, this copy step could be avoided with shared mem
 
     if bragg:
-        print("inverting mask to retain Bragg peaks")
+        logger.info("Inverting mask to retain Bragg peaks")
         mask = np.logical_not(mask)
     else:
-        print("masking count threshold peaks")
+        logger.info("Adding count threshold peaks to mask")
         P.to_mask(IS.phi, IS.iy, IS.ix, mask_in=mask)
 
-    # add peaks
-    print(f"Saving mask to {outfile}")
+    masked_fraction = np.sum(mask) / mask.size
+    logger.info("Masked pixels: {:.2%}", masked_fraction)
 
     maskobj = GridData((IS.phi, IS.iy, IS.ix), mask)
     saveobj(maskobj, outfile, name="mask", append=False)
-
-    print("done!")
+    logger.info("Mask creation completed successfully")
 
 
 @with_logging()

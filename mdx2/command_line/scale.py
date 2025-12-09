@@ -148,25 +148,25 @@ def parse_arguments(args=None):
 
 def mask_outliers(MR, outlier):
     """Mask outliers"""
-    print(f"    applying scale factors")
+    logger.info("    Applying scale factors...")
     MR.apply()
-    print(f"    merging")
+    logger.info("    Merging...")
     Im, sigmam, counts = MR.data.merge()
     nout = MR.data.mask_outliers(Im, outlier)
-    print(f"removed {nout} outliers > {outlier} sigma")
+    logger.info("    Removed {} outliers (>{} sigma)", nout, outlier)
 
 
 def refine_offset_model(MR, offset_params):
     """Refine the offset model"""
     old_x2 = 1e6  # initialize to some large number
     for j in range(offset_params.niter):
-        print(f"  iteration {j + 1} of {offset_params.niter}")
-        print(f"    applying scale factors")
+        logger.info("  Iteration {}/{}", j + 1, offset_params.niter)
+        logger.info("    Applying scale factors...")
         MR.apply()
-        print(f"    merging")
+        logger.info("    Merging...")
         Im, sigmam, counts = MR.data.merge()
 
-        print(f"    fitting the model")
+        logger.info("    Fitting the model...")
         x2 = MR.cfit(
             Im,
             offset_params.alpha_x,
@@ -174,9 +174,9 @@ def refine_offset_model(MR, offset_params):
             offset_params.alpha_min,
             offset_params.min,
         )  # 1,1,.1,min_c=0
-        print(f"    current x2: {x2}")
+        logger.info("    χ²: {:.6f}", x2)
         if old_x2 - x2 < offset_params.x2tol:
-            print(f"    change in x2 less than tolerance of {offset_params.x2tol}, stopping")
+            logger.info("    Converged (Δχ² < {})", offset_params.x2tol)
             break
         old_x2 = x2
 
@@ -185,16 +185,16 @@ def refine_scaling_model(MR, scaling_params):
     """Refine the scaling model"""
     old_x2 = 1e6  # initialize to some large number
     for j in range(scaling_params.niter):
-        print(f"  iteration {j + 1} of {scaling_params.niter}")
-        print(f"    applying scale factors")
+        logger.info("  Iteration {}/{}", j + 1, scaling_params.niter)
+        logger.info("    Applying scale factors...")
         MR.apply()
-        print(f"    merging")
+        logger.info("    Merging...")
         Im, sigmam, counts = MR.data.merge()
-        print(f"    fitting the model")
+        logger.info("    Fitting the model...")
         x2 = MR.bfit(Im, scaling_params.alpha)
-        print(f"    current x2: {x2}")
+        logger.info("    χ²: {:.6f}", x2)
         if old_x2 - x2 < scaling_params.x2tol:
-            print(f"    change in x2 less than tolerance of {scaling_params.x2tol}, stopping")
+            logger.info("    Converged (Δχ² < {})", scaling_params.x2tol)
             break
         old_x2 = x2
 
@@ -203,12 +203,12 @@ def refine_scaling_and_offset_model(MR, scaling_params, offset_params):
     """Refine the scaling and offset model"""
     old_x2 = 1e6  # initialize to some large number
     for j in range(offset_params.niter):
-        print(f"  iteration {j + 1} of {offset_params.niter}")
-        print(f"    applying scale factors")
+        logger.info("  Iteration {}/{}", j + 1, offset_params.niter)
+        logger.info("    Applying scale factors...")
         MR.apply()
-        print(f"    merging")
+        logger.info("    Merging...")
         Im, sigmam, counts = MR.data.merge()
-        print(f"    fitting the model")
+        logger.info("    Fitting the model...")
         MR.cfit(
             Im,
             offset_params.alpha_x,
@@ -217,9 +217,9 @@ def refine_scaling_and_offset_model(MR, scaling_params, offset_params):
             offset_params.min,
         )  # 1,1,.1,min_c=0
         x2 = MR.bfit(Im, scaling_params.alpha)
-        print(f"    current x2: {x2}")
+        logger.info("    χ²: {:.6f}", x2)
         if old_x2 - x2 < offset_params.x2tol:
-            print(f"    change in x2 less than tolerance of {offset_params.x2tol}, stopping")
+            logger.info("    Converged (Δχ² < {})", offset_params.x2tol)
             break
         old_x2 = x2
 
@@ -228,16 +228,16 @@ def refine_detector_model(MR, detector_params):
     """Refine the detector model"""
     old_x2 = 1e6  # initialize to some large number
     for j in range(detector_params.niter):
-        print(f"  iteration {j + 1} of {detector_params.niter}")
-        print(f"    applying scale factors")
+        logger.info("  Iteration {}/{}", j + 1, detector_params.niter)
+        logger.info("    Applying scale factors...")
         MR.apply()
-        print(f"    merging")
+        logger.info("    Merging...")
         Im, sigmam, counts = MR.data.merge()
-        print(f"    fitting the model")
+        logger.info("    Fitting the model...")
         x2 = MR.dfit(Im, detector_params.alpha)
-        print(f"    current x2: {x2}")
+        logger.info("    χ²: {:.6f}", x2)
         if old_x2 - x2 < detector_params.x2tol:
-            print(f"    change in x2 less than tolerance of {detector_params.x2tol}, stopping")
+            logger.info("    Converged (Δχ² < {})", detector_params.x2tol)
             break
         old_x2 = x2
 
@@ -246,16 +246,16 @@ def refine_absorption_model(MR, absorption_params):
     """Refine the absorption model"""
     old_x2 = 1e6  # initialize to some large number
     for j in range(absorption_params.niter):
-        print(f"  iteration {j + 1} of {absorption_params.niter}")
-        print(f"    applying scale factors")
+        logger.info("  Iteration {}/{}", j + 1, absorption_params.niter)
+        logger.info("    Applying scale factors...")
         MR.apply()
-        print(f"    merging")
+        logger.info("    Merging...")
         Im, sigmam, counts = MR.data.merge()
-        print(f"    fitting the model")
+        logger.info("    Fitting the model...")
         x2 = MR.afit(Im, absorption_params.alpha_xy, absorption_params.alpha_z)
-        print(f"    current x2: {x2}")
+        logger.info("    χ²: {:.6f}", x2)
         if old_x2 - x2 < absorption_params.x2tol:
-            print(f"    change in x2 less than tolerance of {absorption_params.x2tol}, stopping")
+            logger.info("    Converged (Δχ² < {})", absorption_params.x2tol)
             break
         old_x2 = x2
 
@@ -272,15 +272,15 @@ def load_data_for_scaling(*hkl_files, subsample=None, merge_isotropic=False):
 
     hkl = HKLTable.concatenate(tabs)
 
-    print(f"loaded {len(hkl)} reflections from {len(hkl_files)} files")
+    logger.info("Loaded {} reflections from {} file(s)", len(hkl), len(hkl_files))
 
     if merge_isotropic:
         # TODO: should bin width be a parameter?
         # (here we use 0.001 as a default bin width)
-        print("Grouping observations by scattering vector length (isotropic averaging)")
+        logger.info("Grouping by scattering vector length (isotropic averaging)...")
         index_map = np.floor(hkl.s * 1000).astype(np.uint16)
     else:
-        print("Grouping redundant observations")
+        logger.info("Grouping redundant observations...")
         _, index_map, _ = hkl.unique()
 
     S = ScaledData(
@@ -296,7 +296,7 @@ def load_data_for_scaling(*hkl_files, subsample=None, merge_isotropic=False):
 
     nsingletons = S.mask_singletons()
     if nsingletons > 0:
-        print(f"masked {nsingletons} singletons (reflections with only one observation)")
+        logger.info("Masked {} singletons (reflections with only one observation)", nsingletons)
 
     return S
 
@@ -344,58 +344,59 @@ def run_scale(params):
             model_refiner_pre.detector.model = model_refiner.detector.model
             model_refiner_pre.absorption.model = model_refiner.absorption.model
         # refine models on prescaling data
-        print("starting prescaling refinement")
+        logger.info("Starting prescaling refinement...")
         if params.prescale.scaling and params.scaling.enable:
-            print("optimizing scale vs. phi (b)")
+            logger.info("Optimizing scale vs. phi (b)...")
             refine_scaling_model(MR_pre, params.scaling)
             mask_outliers(MR_pre, params.scaling.outlier)
         if params.prescale.offset and params.prescale.scaling and params.offset.enable and params.scaling.enable:
-            print("optimizing scaling and offset models together (b,c)")
+            logger.info("Optimizing scaling and offset models together (b,c)...")
             refine_scaling_and_offset_model(MR_pre, params.scaling, params.offset)
             mask_outliers(MR_pre, params.offset.outlier)
         if params.prescale.offset and params.offset.enable:
-            print("optimizing offset vs. phi and resolution (c)")
+            logger.info("Optimizing offset vs. phi and resolution (c)...")
             refine_offset_model(MR_pre, params.offset)
             mask_outliers(MR_pre, params.offset.outlier)
         if params.prescale.detector and params.detector.enable:
-            print("optimizing scale vs. detector position (d)")
+            logger.info("Optimizing scale vs. detector position (d)...")
             refine_detector_model(MR_pre, params.detector)
             mask_outliers(MR_pre, params.detector.outlier)
         if params.prescale.absorption and params.absorption.enable:
-            print("optimizing scale vs. detector position and phi (a)")
+            logger.info("Optimizing scale vs. detector position and phi (a)...")
             refine_absorption_model(MR_pre, params.absorption)
             mask_outliers(MR_pre, params.absorption.outlier)
-        print("finished prescaling refinement")
+        logger.info("Prescaling refinement completed")
 
-    print("starting main scaling refinement")
+    logger.info("Starting main scaling refinement...")
 
     if params.scaling.enable:
-        print("optimizing scale vs. phi (b)")
+        logger.info("Optimizing scale vs. phi (b)...")
         refine_scaling_model(MR, params.scaling)
         mask_outliers(MR, params.scaling.outlier)
 
     if params.scaling.enable and params.offset.enable:
-        print("optimizing scaling and offset models together (b,c)")
+        logger.info("Optimizing scaling and offset models together (b,c)...")
         refine_scaling_and_offset_model(MR, params.scaling, params.offset)
         mask_outliers(MR, params.offset.outlier)
 
     if params.offset.enable:
-        print("optimizing offset vs. phi and resolution (c)")
+        logger.info("Optimizing offset vs. phi and resolution (c)...")
         refine_offset_model(MR, params.offset)
         mask_outliers(MR, params.offset.outlier)
 
     if params.detector.enable:
-        print("optimizing scale vs. detector position (d)")
+        logger.info("Optimizing scale vs. detector position (d)...")
         refine_detector_model(MR, params.detector)
         mask_outliers(MR, params.detector.outlier)
 
     if params.absorption.enable:
-        print("optimizing scale vs. detector position and phi (a)")
+        logger.info("Optimizing scale vs. detector position and phi (a)...")
         refine_absorption_model(MR, params.absorption)
         mask_outliers(MR, params.absorption.outlier)
 
-    print("finished refining")
+    logger.info("Refinement completed")
 
+    logger.info("Saving scaling models...")
     for model_refiner, fn in zip(MR._batch_refiners, params.outfile):
         models = dict(
             scaling_model=model_refiner.scaling.model,
@@ -410,7 +411,7 @@ def run_scale(params):
                 saveobj(model, fn, name=name, append=file_created)
                 file_created = True
 
-    print("done!")
+    logger.info("Scaling completed successfully")
 
 
 @with_logging()
