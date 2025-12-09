@@ -505,7 +505,8 @@ class ImageSeries:
     @property
     def chunks(self):
         if isinstance(self.data, NXvirtualfield):
-            ch = h5py.File(self.data._vfiles[0], "r")[self.data._vpath].chunks
+            with h5py.File(self.data._vfiles[0], "r") as f:
+                ch = f[self.data._vpath].chunks
         elif isinstance(self.data, NXfield):
             ch = self.data.chunks
         else:
