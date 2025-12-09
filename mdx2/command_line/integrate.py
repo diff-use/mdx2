@@ -62,11 +62,6 @@ def run_integrate(params):
     else:
         mask = None
 
-    # if opts.limits is not None:
-    #    lim = opts.limits
-    # else:
-    #    lim = None
-
     def intchunk(sl):
         ims = IS[sl]
         if mask is not None:
