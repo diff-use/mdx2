@@ -78,7 +78,7 @@ def run_mask_peaks(params):
             n_jobs,
         )
         masklist = parallel(delayed(maskchunk)(sl) for sl in slices)
-    for msk, sl in zip(masklist, IS.chunk_slice_iterator()):
+    for msk, sl in zip(masklist, slices):
         mask[sl] = msk  # <-- note, this copy step could be avoided with shared mem
 
     if bragg:
