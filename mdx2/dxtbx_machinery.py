@@ -3,7 +3,7 @@ import re
 import numpy as np
 from cctbx.eltbx import attenuation_coefficient
 from dxtbx import flumpy
-from dxtbx.format.FormatPilatusHelpers import _get_pad_module_gap
+from dxtbx.format.FormatPilatusHelpers import sensor_active_areas
 from dxtbx.model.experiment_list import ExperimentList
 from scitbx import matrix
 
@@ -32,13 +32,42 @@ class Experiment:
                     f"Experiment detector type is '{self._panel.get_type()}'; mdx2 requires SENSOR_PAD detectors"
                 )
 
-            # Check that the detector is in the known database and cache the result
-            self._pad_module_gap = _get_pad_module_gap((self._panel,))
-            if self._pad_module_gap is None:
+            # Check that the detector is in the known database using public API
+            active_areas = sensor_active_areas((self._panel,))
+            if active_areas is None or len(active_areas) == 0:
                 raise RuntimeError(
                     "Experiment detector geometry not found in dxtbx detector database; "
                     "mdx2 may not be compatible with this detector type"
                 )
+
+            # Extract the first (and only) active area tuple
+            active_area = active_areas[0]
+            # Note: active_area is (fast_start, slow_start, fast_end, slow_end)
+            fast_start, slow_start, fast_end, slow_end = active_area
+            image_size = self._panel.get_image_size()  # (fast, slow)
+
+            # Module size is the active area dimension
+            self._module_size_slow = slow_end - slow_start
+            self._module_size_fast = fast_end - fast_start
+
+            # Calculate number of modules in each direction
+            # image_size is (fast, slow), so image_size[1] is slow, image_size[0] is fast
+            num_modules_slow = image_size[1] // self._module_size_slow
+            num_modules_fast = image_size[0] // self._module_size_fast
+
+            # Calculate gap sizes
+            if num_modules_slow > 1:
+                total_gap_slow = image_size[1] - (num_modules_slow * self._module_size_slow)
+                self._gap_slow = total_gap_slow // (num_modules_slow - 1)
+            else:
+                self._gap_slow = 0
+
+            if num_modules_fast > 1:
+                total_gap_fast = image_size[0] - (num_modules_fast * self._module_size_fast)
+                self._gap_fast = total_gap_fast // (num_modules_fast - 1)
+            else:
+                self._gap_fast = 0
+
         except (AssertionError, RuntimeError) as e:
             raise RuntimeError(f"Experiment detector not compatible with mdx2: {e}") from e
         except Exception as e:
@@ -73,8 +102,8 @@ class Experiment:
     @property
     def panel_offset(self):
         """offset in pixels (stride) of successive panels in the image file"""
-        row_size = self._pad_module_gap.module_size_slow + self._pad_module_gap.gap_slow
-        col_size = self._pad_module_gap.module_size_fast + self._pad_module_gap.gap_fast
+        row_size = self._module_size_slow + self._gap_slow
+        col_size = self._module_size_fast + self._gap_fast
         return row_size, col_size
 
     @property
