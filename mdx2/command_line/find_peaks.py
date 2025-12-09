@@ -5,6 +5,7 @@ Find and analyze peaks in an image stack
 from dataclasses import dataclass
 
 import numpy as np
+from joblib import Parallel, delayed
 from loguru import logger
 from simple_parsing import ArgumentParser, field  # pip install simple-parsing
 
@@ -43,33 +44,61 @@ def run_find_peaks(params):
     outfile = params.outfile
     nproc = params.nproc
 
+    logger.info("Loading geometry and image data...")
     MI = loadobj(geom, "miller_index")
     IS = loadobj(data, "image_series")
 
-    print(f"finding pixels with counts above threshold: {count_threshold}")
-    P = IS.find_peaks_above_threshold(count_threshold, nproc=nproc)
+    logger.info("Finding pixels above threshold: {}", count_threshold)
 
-    print("indexing peaks")
+    # Find peaks in parallel
+    def peaksearch(sl):
+        ims = IS[sl]
+        im_data = ims.data_masked
+        peaks = Peaks.where(im_data > count_threshold, ims.phi, ims.iy, ims.ix)
+        if peaks.size:
+            return peaks
+
+    slices = list(IS.chunk_slice_iterator())
+    with Parallel(n_jobs=nproc, verbose=10) as parallel:
+        backend_name = parallel._backend.__class__.__name__
+        logger.info(
+            "Searching for peaks in {} image chunks using {} processes (backend: {})...",
+            len(slices),
+            nproc,
+            backend_name,
+        )
+        peaklist = parallel(delayed(peaksearch)(sl) for sl in slices)
+
+    P = Peaks.stack([p for p in peaklist if p is not None])
+    logger.info("Found {} peak pixels", P.size)
+
+    logger.info("Indexing peaks...")
     h, k, l = MI.interpolate(P.phi, P.iy, P.ix)
     dh = h - np.round(h)
     dk = k - np.round(k)
     dl = l - np.round(l)
 
-    print("fitting Gaussian peak model")
+    logger.info("Fitting Gaussian peak model...")
     GP, is_outlier = GaussianPeak.fit_to_points(dh, dk, dl, sigma_cutoff=sigma_cutoff)
+    logger.info("Rejected {} outliers (sigma cutoff: {})", np.sum(is_outlier), sigma_cutoff)
+    logger.info("Peak model r0: {}", GP.r0)
+
+    # Compute principal axes of error ellipsoid using SVD
+    # sigma = U @ diag(s) @ V.T, where U contains the principal axes
+    # and s contains the semi-axis lengths
+    U, s, Vt = np.linalg.svd(GP.sigma)
+
+    logger.info("Error ellipsoid semi-axis lengths: {}", s)
+    logger.info("Error ellipsoid principal axis 1: {}", U[:, 0])
+    logger.info("Error ellipsoid principal axis 2: {}", U[:, 1])
+    logger.info("Error ellipsoid principal axis 3: {}", U[:, 2])
 
     Outliers = Peaks(P.phi[is_outlier], P.iy[is_outlier], P.ix[is_outlier])
-
-    print(f"{np.sum(is_outlier)} peaks were rejected as outliers")
-    print("GaussianPeak model:", GP)
-
-    print(f"Saving results to {outfile}")
 
     saveobj(GP, outfile, name="peak_model", append=False)
     saveobj(P, outfile, name="peaks", append=True)
     saveobj(Outliers, outfile, name="outliers", append=True)
-
-    print("done!")
+    logger.info("Peak finding completed successfully")
 
 
 @with_logging()
