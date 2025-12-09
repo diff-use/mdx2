@@ -7,7 +7,7 @@ from loguru import logger
 
 from mdx2 import __version__ as mdx2_version
 from mdx2.geometry import Crystal
-from mdx2.utils import nxload, nxsave
+from mdx2.io import nxload, nxsave
 
 
 def test_mdx2_version_number():

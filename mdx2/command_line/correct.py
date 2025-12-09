@@ -10,7 +10,7 @@ from loguru import logger
 from simple_parsing import ArgumentParser, field  # pip install simple-parsing
 
 from mdx2.command_line import with_logging
-from mdx2.utils import loadobj, saveobj
+from mdx2.io import loadobj, saveobj
 
 
 @dataclass

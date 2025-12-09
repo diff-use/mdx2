@@ -12,7 +12,7 @@ from simple_parsing import ArgumentParser, field
 from mdx2.command_line import with_logging
 from mdx2.data import HKLTable
 from mdx2.geometry import GridData
-from mdx2.utils import loadobj, saveobj
+from mdx2.io import loadobj, saveobj
 
 
 @dataclass

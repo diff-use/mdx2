@@ -11,8 +11,8 @@ from simple_parsing import ArgumentGenerationMode, ArgumentParser, NestedMode, f
 
 from mdx2.command_line import with_logging
 from mdx2.data import HKLTable
+from mdx2.io import loadobj, saveobj
 from mdx2.scaling import BatchModelRefiner, ScaledData
-from mdx2.utils import loadobj, saveobj
 
 
 @dataclass

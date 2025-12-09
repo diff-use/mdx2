@@ -12,12 +12,8 @@ from simple_parsing import ArgumentParser, field
 
 from mdx2.command_line import log_parallel_backend, with_logging
 from mdx2.geometry import GridData
-from mdx2.utils import (
-    loadobj,
-    nxload,  # mask is too big to read all at once?
-    saveobj,
-    slice_sections,
-)
+from mdx2.io import loadobj, nxload, saveobj
+from mdx2.utils import slice_sections
 
 
 @dataclass

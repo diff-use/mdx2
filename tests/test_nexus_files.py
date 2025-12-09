@@ -2,7 +2,7 @@ import nexusformat.nexus as nxs
 import numpy as np
 
 from mdx2.data import ImageSeries
-from mdx2.utils import nxsave
+from mdx2.io import nxsave
 
 
 def test_writing_data_after_nxsave(tmp_path):

@@ -12,7 +12,7 @@ from simple_parsing import ArgumentParser, field  # pip install simple-parsing
 from mdx2.command_line import log_parallel_backend, with_logging
 from mdx2.data import Peaks
 from mdx2.geometry import GaussianPeak
-from mdx2.utils import loadobj, saveobj
+from mdx2.io import loadobj, saveobj
 
 
 @dataclass

@@ -7,7 +7,7 @@ import pandas as pd
 from nexusformat.nexus import NXdata, NXfield, NXgroup, NXreflections, NXvirtualfield
 
 from mdx2.dxtbx_machinery import Experiment
-from mdx2.utils import nxload, saveobj
+from mdx2.io import nxload, saveobj
 
 
 class Peaks:

@@ -12,7 +12,7 @@ from simple_parsing import ArgumentParser, field
 
 from mdx2.command_line import log_parallel_backend, with_logging
 from mdx2.data import HKLTable
-from mdx2.utils import (
+from mdx2.io import (
     loadobj,
     nxload,  # mask is too big to read all at once?
     saveobj,

@@ -12,7 +12,7 @@ from simple_parsing import ArgumentParser, field
 from mdx2.command_line import log_parallel_backend, with_logging
 from mdx2.data import ImageSeries
 from mdx2.dxtbx_machinery import ImageSet
-from mdx2.utils import nxload
+from mdx2.io import nxload
 
 
 @dataclass
