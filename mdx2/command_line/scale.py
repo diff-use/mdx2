@@ -146,12 +146,8 @@ def parse_arguments(args=None):
         nested_mode=NestedMode.WITHOUT_ROOT,
     )
     parser.add_arguments(Parameters, dest="parameters")
-    try:
-        opts = parser.parse_args(args)
-        return opts.parameters
-    except ValueError as e:
-        # Convert ValueError to SystemExit for CLI context
-        raise SystemExit(str(e)) from e
+    opts = parser.parse_args(args)
+    return opts.parameters
 
 
 def mask_outliers(MR, outlier):

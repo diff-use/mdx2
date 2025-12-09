@@ -406,7 +406,7 @@ def test_bin_image_series_parse_arguments(args, expected, raises):
                 "Friedel",
             ],
             None,
-            SystemExit,  # argparse throws SystemExit on error
+            ValueError,  # __post_init__ raises ValueError for validation errors
         ),
     ],
 )

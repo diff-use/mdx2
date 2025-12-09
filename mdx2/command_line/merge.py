@@ -34,6 +34,11 @@ class Parameters:
     absorption: bool = field(default=True, negative_prefix="--no-")  # apply absorption model if present
     detector: bool = field(default=True, negative_prefix="--no-")  # apply detector model if present
 
+    def __post_init__(self):
+        """Validate inter-parameter dependencies"""
+        if self.split == "Friedel" and self.geometry is None:
+            raise ValueError("--geometry argument is required for symmetry-based splitting")
+
 
 # note: negative_prefix is used to allow --no-scaling, --no-offset, etc. for consistency with old argparse api
 # future: could switch split to an Enum type, to simplify selection of choices by alternate APIs
@@ -44,8 +49,6 @@ def parse_arguments(args=None):
     parser = ArgumentParser(description=__doc__)
     parser.add_arguments(Parameters, dest="parameters")
     opts = parser.parse_args(args)
-    if opts.parameters.split == "Friedel" and opts.parameters.geometry is None:
-        raise SystemExit("--geometry argument is required for symmetry-based splitting")
     return opts.parameters
 
 
