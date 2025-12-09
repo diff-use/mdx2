@@ -55,11 +55,10 @@ def run_integrate(params):
     IS = loadobj(data, "image_series")
 
     if maskfile is not None:
-        # MA = loadobj(maskfile,'mask')
-        # mask = MA.data
-        nxs = nxload(maskfile)  # <-- loadobj fails if the array is too large. weird
+        logger.info("Loading mask...")
+        # Use nxload directly instead of loadobj because loadobj fails for very large arrays
+        nxs = nxload(maskfile)
         mask = nxs.entry.mask.signal  # nxfield
-
     else:
         mask = None
 
