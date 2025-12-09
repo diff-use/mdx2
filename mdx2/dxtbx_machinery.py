@@ -32,9 +32,9 @@ class Experiment:
                     f"Experiment detector type is '{self._panel.get_type()}'; mdx2 requires SENSOR_PAD detectors"
                 )
 
-            # Check that the detector is in the known database
-            d = _get_pad_module_gap((self._panel,))
-            if d is None:
+            # Check that the detector is in the known database and cache the result
+            self._pad_module_gap = _get_pad_module_gap((self._panel,))
+            if self._pad_module_gap is None:
                 raise RuntimeError(
                     "Experiment detector geometry not found in dxtbx detector database; "
                     "mdx2 may not be compatible with this detector type"
@@ -73,9 +73,8 @@ class Experiment:
     @property
     def panel_offset(self):
         """offset in pixels (stride) of successive panels in the image file"""
-        d = _get_pad_module_gap((self._panel,))
-        row_size = d.module_size_slow + d.gap_slow
-        col_size = d.module_size_fast + d.gap_fast
+        row_size = self._pad_module_gap.module_size_slow + self._pad_module_gap.gap_slow
+        col_size = self._pad_module_gap.module_size_fast + self._pad_module_gap.gap_fast
         return row_size, col_size
 
     @property
