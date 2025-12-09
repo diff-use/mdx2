@@ -612,6 +612,8 @@ class ImageSeries:
         stored in a separate file. The source_template is used to generate the filenames for the source
         files. The template may contain {prefix}, {name}, {index}, and {ext} fields, which will be replaced
         with the prefix of the main filename, the slab index, and the extension of the main filename, respectively.
+
+        Note: When virtual=True, this method modifies self.data to reference the newly created virtual dataset.
         """
         if virtual:
             slices = [sl for sl in self.chunk_slice_along_axis(0)]
