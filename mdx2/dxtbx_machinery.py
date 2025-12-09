@@ -388,11 +388,18 @@ def calc_U_matrix_at_phi(crystal, scan, phi_vals_deg):
         U = np.tile(U, (np.size(phi_vals_deg), 1, 1))
     else:
         base, frac = phi_to_base_fraction_index(scan, phi_vals_deg)
+        imax = crystal.num_scan_points
         U = np.empty([np.size(base), 3, 3])
         for ind, (b, f) in enumerate(zip(base, frac)):
             U1 = crystal.get_U_at_scan_point(b)
-            U2 = crystal.get_U_at_scan_point(b + 1)
-            Uvals = interp_rotation_matrices(U1, U2, f)
+            # Handle boundary: clamp second index to valid range
+            b2 = min(b + 1, imax - 1)
+            if b2 == b:
+                # At the boundary, use U1 directly without interpolation
+                Uvals = U1
+            else:
+                U2 = crystal.get_U_at_scan_point(b2)
+                Uvals = interp_rotation_matrices(U1, U2, f)
             U[ind, :, :] = np.array(Uvals).reshape(3, 3)
     return U
 
@@ -428,11 +435,18 @@ def calc_B_matrix_at_phi(crystal, scan, phi_vals_deg):
         B = np.tile(B, (np.size(phi_vals_deg), 1, 1))
     else:
         base, frac = phi_to_base_fraction_index(scan, phi_vals_deg)
+        imax = crystal.num_scan_points
         B = np.empty([np.size(base), 3, 3])
         for ind, (b, f) in enumerate(zip(base, frac)):
             B1 = np.array(crystal.get_B_at_scan_point(b)).reshape([3, 3])
-            B2 = np.array(crystal.get_B_at_scan_point(b + 1)).reshape([3, 3])
-            B[ind, :, :] = B1 * (1 - f) + B2 * f  # element-wise linear interpolation
+            # Handle boundary: clamp second index to valid range
+            b2 = min(b + 1, imax - 1)
+            if b2 == b:
+                # At the boundary, use B1 directly without interpolation
+                B[ind, :, :] = B1
+            else:
+                B2 = np.array(crystal.get_B_at_scan_point(b2)).reshape([3, 3])
+                B[ind, :, :] = B1 * (1 - f) + B2 * f  # element-wise linear interpolation
     return B
 
 
