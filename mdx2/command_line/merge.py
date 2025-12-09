@@ -3,7 +3,7 @@ Merge corrected intensities using a scaling model
 """
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 from loguru import logger
@@ -20,8 +20,8 @@ from mdx2.utils import loadobj, saveobj
 class Parameters:
     """Options for merging scaled intensities"""
 
-    hkl: str = field(positional=True, nargs="+")  # NeXus file(s) containing hkl_table
-    scale: str = field(nargs="+")  # NeXus file(s) with scaling models
+    hkl: List[str] = field(positional=True, nargs="+")  # NeXus file(s) containing hkl_table
+    scale: List[str] = field(nargs="+")  # NeXus file(s) with scaling models
     outlier: Optional[float] = None  # optional standard error cutoff for outlier rejection
     split: Optional[str] = field(default=None, choices=["randomHalf", "weightedRandomHalf", "Friedel"])
     """also merge data into separate columns based on splitting criteria"""
