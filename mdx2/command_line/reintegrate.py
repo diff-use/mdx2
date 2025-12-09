@@ -114,8 +114,8 @@ def run_reintegrate(params):
     hkl = HKLTable(miller_index.h.ravel(), miller_index.k.ravel(), miller_index.l.ravel(), ndiv=params.subdivide)
     hkl = hkl.to_asu(symmetry)
     array_range = (min(hkl.H.min(), 0), hkl.H.max(), min(hkl.K.min(), 0), hkl.K.max(), min(hkl.L.min(), 0), hkl.L.max())
-    array_size = tuple(r - l + 1 for l, r in zip(array_range[::2], array_range[1::2]))
-    array_ori = tuple(l / s for l, s in zip(array_range[::2], params.subdivide))
+    array_size = tuple(hi - lo + 1 for lo, hi in zip(array_range[::2], array_range[1::2]))
+    array_ori = tuple(lo / s for lo, s in zip(array_range[::2], params.subdivide))
     logger.info("Output grid size: {}", array_size)
     logger.info("Allocating empty output arrays...")
     data_arrays = {
