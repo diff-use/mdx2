@@ -88,7 +88,7 @@ def run_find_peaks(params):
     # Compute principal axes of error ellipsoid using SVD
     # sigma = U @ diag(s) @ V.T, where U contains the principal axes
     # and s contains the semi-axis lengths
-    U, s, Vt = np.linalg.svd(GP.sigma)
+    U, s, _Vt = np.linalg.svd(GP.sigma)
 
     logger.info("Error ellipsoid semi-axis lengths: {}", s)
     logger.info("Error ellipsoid principal axis 1: {}", U[:, 0])
