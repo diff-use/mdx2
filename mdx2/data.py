@@ -194,9 +194,19 @@ class HKLTable:
             raise ValueError("Cannot concatenate empty list of HKLTable objects")
 
         ndiv = tabs[0].ndiv  # assume the first one is canonical
+
+        # Validate that all tables have matching ndiv values
+        for j in range(1, len(tabs)):
+            if tabs[j].ndiv != ndiv:
+                raise ValueError(
+                    f"Cannot concatenate HKLTable objects with mismatched ndiv values: "
+                    f"tabs[0].ndiv={ndiv}, tabs[{j}].ndiv={tabs[j].ndiv}"
+                )
+
+        # Find data keys common to all tables
         data_keys = set(tabs[0]._data_keys)
         for j in range(1, len(tabs)):
-            data_keys = data_keys.intersection(data_keys)
+            data_keys &= set(tabs[j]._data_keys)
 
         def concat(key):
             return np.concatenate([tab.__dict__[key] for tab in tabs])
