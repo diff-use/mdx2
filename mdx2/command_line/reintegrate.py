@@ -51,8 +51,6 @@ def parse_arguments(args=None):
 
 
 def run_reintegrate(params):
-    # TODO: what if scaling models are missing from the nexus file?
-
     logger.info("Loading geometry and image data...")
     miller_index = loadobj(params.geom, "miller_index")
     image_series = loadobj(params.data, "image_series")
@@ -62,10 +60,21 @@ def run_reintegrate(params):
 
     logger.info("Loading optional models...")
     background = loadobj(params.background, "binned_image_series") if params.background else None
-    scaling_model = loadobj(params.scale, "scaling_model") if params.scale else None
-    absorption_model = loadobj(params.scale, "absorption_model") if params.scale else None
-    offset_model = loadobj(params.scale, "offset_model") if params.scale else None
-    detector_model = loadobj(params.scale, "detector_model") if params.scale else None
+    if params.scale:
+        scale_file = nxload(params.scale)
+        scaling_model = loadobj(params.scale, "scaling_model") if "scaling_model" in scale_file.entry.keys() else None
+        absorption_model = (
+            loadobj(params.scale, "absorption_model") if "absorption_model" in scale_file.entry.keys() else None
+        )
+        offset_model = loadobj(params.scale, "offset_model") if "offset_model" in scale_file.entry.keys() else None
+        detector_model = (
+            loadobj(params.scale, "detector_model") if "detector_model" in scale_file.entry.keys() else None
+        )
+    else:
+        scaling_model = None
+        absorption_model = None
+        offset_model = None
+        detector_model = None
     mask = nxload(params.mask).entry.mask.signal if params.mask else None
 
     def calc_corrections(tab):
