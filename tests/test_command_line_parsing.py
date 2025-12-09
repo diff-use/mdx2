@@ -78,6 +78,18 @@ def test_import_data_parse_arguments(args, expected, raises):
             None,
             SystemExit,
         ),
+        # Negative sample_spacing value
+        (
+            ["test.expt", "--sample_spacing", "1", "-10", "10", "--outfile", "geometry.nxs"],
+            None,
+            ValueError,
+        ),
+        # Zero sample_spacing value
+        (
+            ["test.expt", "--sample_spacing", "0", "10", "10", "--outfile", "geometry.nxs"],
+            None,
+            ValueError,
+        ),
     ],
 )
 def test_import_geometry_parse_arguments(args, expected, raises):

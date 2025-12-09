@@ -21,6 +21,12 @@ class Parameters:
     sample_spacing: Tuple[int, int, int] = (1, 10, 10)  # interval in degrees or pixels (phi, iy, ix)
     outfile: str = "geometry.nxs"  # name of the output NeXus file
 
+    def __post_init__(self):
+        """Validate sample_spacing parameter"""
+        for i, spacing in enumerate(self.sample_spacing):
+            if spacing <= 0:
+                raise ValueError(f"sample_spacing[{i}] must be positive, got {spacing}")
+
 
 def parse_arguments(args=None):
     """Parse commandline arguments"""
