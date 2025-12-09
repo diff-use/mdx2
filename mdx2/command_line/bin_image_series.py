@@ -55,7 +55,8 @@ def run_bin_image_series(params):
 
     if maskfile is not None:
         logger.info("Loading mask...")
-        nxs = nxload(maskfile)  # <-- loadobj fails if the array is too large. weird
+        # Use nxload directly instead of loadobj because loadobj fails for very large arrays
+        nxs = nxload(maskfile)
         mask = nxs.entry.mask.signal  # nxfield
     else:
         mask = None
