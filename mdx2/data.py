@@ -533,7 +533,7 @@ class ImageSeries:
             if isinstance(self.data, NXfield) and self.data._value is None and self.data._memfile is None:
                 # TODO: there might be instances where this has strange behavior, for instance if the NXfield was
                 # already saved to a file
-                new_data = self.data.__deepcopy__()
+                new_data = deepcopy(self.data)
                 new_data.shape = (new_phi.size,) + new_data.shape[1:]
                 if new_data.chunks[0] > new_phi.size:
                     new_data.chunks = (new_phi.size,) + new_data.chunks[1:]

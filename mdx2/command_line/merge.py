@@ -158,7 +158,7 @@ def run_merge(params):
             isminus = has_inversion[hkl.op]
             groups = [~isminus, isminus]
         else:
-            raise Exception("something bad happened")
+            raise ValueError(f"Unhandled merge mode: {split!r}")
         for j, g in enumerate(groups):
             G = MR.data.copy()
             G.mask = G.mask | ~g
