@@ -29,7 +29,7 @@ def nxload(filename, mode="r", **kwargs):
         warnings.warn(
             f"mdx2 version mismatch: file version {mdx2_version_file}, installed version {mdx2.__version__}",
             UserWarning,
-            stacklevel=2
+            stacklevel=2,
         )
     _patch_virtualfields(nxroot)
     return nxroot

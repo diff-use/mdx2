@@ -117,6 +117,7 @@ def run_integrate(params):
     hkl_table.counts = hkl_table.counts.astype(np.int32)
     hkl_table.pixels = hkl_table.pixels.astype(np.int32)
 
+    logger.info("Saving integrated data to {}...", outfile)
     saveobj(hkl_table, outfile, name="hkl_table", append=False)
     logger.info("Integration completed successfully")
 
