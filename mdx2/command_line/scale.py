@@ -100,6 +100,21 @@ class Parameters:
     mca2020: bool = False
     """shortcut for --scaling.enable True --offset.enable True --detector.enable True --absorption.enable True"""
 
+    def __post_init__(self):
+        """Validate and process parameters after initialization"""
+        # Apply mca2020 shortcut to enable all models
+        if self.mca2020:
+            self.scaling.enable = True
+            self.detector.enable = True
+            self.absorption.enable = True
+            self.offset.enable = True
+
+        # Auto-generate output file names if not provided
+        if self.outfile is None:
+            self.outfile = generate_default_outfiles(self.hkl)
+            if self.outfile is None:
+                raise ValueError("unable to auto-generate output file names from input name pattern")
+
 
 def generate_default_outfiles(infiles):
     """Generate default output file names based on input file names.
@@ -131,20 +146,12 @@ def parse_arguments(args=None):
         nested_mode=NestedMode.WITHOUT_ROOT,
     )
     parser.add_arguments(Parameters, dest="parameters")
-    opts = parser.parse_args(args)
-
-    if opts.parameters.mca2020:
-        opts.parameters.scaling.enable = True
-        opts.parameters.detector.enable = True
-        opts.parameters.absorption.enable = True
-        opts.parameters.offset.enable = True
-
-    if opts.parameters.outfile is None:
-        opts.parameters.outfile = generate_default_outfiles(opts.parameters.hkl)
-        if opts.parameters.outfile is None:
-            raise SystemExit("unable to auto-generate output file names from input name pattern")
-
-    return opts.parameters
+    try:
+        opts = parser.parse_args(args)
+        return opts.parameters
+    except ValueError as e:
+        # Convert ValueError to SystemExit for CLI context
+        raise SystemExit(str(e)) from e
 
 
 def mask_outliers(MR, outlier):
