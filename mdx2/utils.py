@@ -8,6 +8,16 @@ from scipy.ndimage import map_coordinates
 
 import mdx2
 
+# Configure default logging for this module when used outside command-line tools
+# Remove default handler and add a custom one with WARNING level and simplified format
+logger.remove()  # Remove default handler
+logger.add(
+    lambda msg: print(msg, end=""),  # Print to stderr (default behavior)
+    level="WARNING",
+    format="<level>{level}</level>: {message}\n",
+    colorize=True,
+)
+
 # FUNCTIONS FOR LOADING AND SAVING MDX2 CLASSES TO NEXUS FILES
 
 
