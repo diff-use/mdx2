@@ -50,6 +50,91 @@ def parse_arguments(args=None):
     return opts.parameters
 
 
+def calc_corrections(
+    tab,
+    crystal,
+    corrections,
+    symmetry,
+    scaling_model=None,
+    absorption_model=None,
+    detector_model=None,
+    offset_model=None,
+    background=None,
+):
+    """
+    Apply correction factors, scaling models, and background subtraction to an HKLTable.
+
+    This function computes various correction factors and applies optional scaling models
+    to prepare integrated reflection data for merging. It modifies the input table in-place
+    and returns the modified table.
+
+    Parameters
+    ----------
+    tab : HKLTable
+        Table with columns: h, k, l, phi, iy, ix, seconds, pixels, ndiv.
+        Must contain partial observations binned by Miller index.
+    crystal : Crystal
+        Crystal object providing ub_matrix for computing scattering vectors.
+    corrections : Corrections
+        Corrections object providing interpolate(iy, ix) method that returns
+        dict with keys: solid_angle, attenuation, polarization, efficiency, d3s.
+    symmetry : Symmetry
+        Symmetry object providing to_asu() method for converting Miller indices
+        to asymmetric unit.
+    scaling_model : ScalingModel, optional
+        Time-dependent scaling model providing interp(phi) method.
+    absorption_model : AbsorptionModel, optional
+        Spatial and time-dependent absorption correction model providing
+        interp(ix, iy, phi) method.
+    detector_model : DetectorModel, optional
+        Detector spatial efficiency model providing interp(ix, iy) method.
+    offset_model : OffsetModel, optional
+        Background offset model as function of resolution and time,
+        providing interp(s, phi) method.
+    background : BinnedImageSeries, optional
+        Background image series providing interpolate(phi, iy, ix) method
+        for background subtraction.
+
+    Returns
+    -------
+    HKLTable
+        Modified table with:
+        - Added columns: scale, background_counts, multiplicity
+        - Removed columns: phi, iy, ix, seconds, s, op, pixels
+        - Miller indices (h, k, l) converted to asymmetric unit
+
+    Notes
+    -----
+    The scale factor combines:
+    - Exposure time (seconds)
+    - Solid angle corrections (solid_angle * attenuation * polarization * efficiency)
+    - Optional scaling models (absorption * scaling * detector)
+
+    The background_counts includes both:
+    - Direct background from binned_image_series
+    - Offset model contribution (if provided)
+    """
+    UB = crystal.ub_matrix
+    s = UB @ np.stack((tab.h, tab.k, tab.l))
+    tab.s = np.sqrt(np.sum(s * s, axis=0))
+    correction_factors = corrections.interpolate(tab.iy, tab.ix)
+    solid_angle = correction_factors["solid_angle"]
+    solid_angle *= correction_factors["attenuation"]
+    solid_angle *= correction_factors["polarization"]
+    solid_angle *= correction_factors["efficiency"]
+    tab.multiplicity = tab.pixels * correction_factors["d3s"] * np.prod(tab.ndiv) / np.linalg.det(UB)
+    b = scaling_model.interp(tab.phi) if scaling_model else 1.0
+    a = absorption_model.interp(tab.ix, tab.iy, tab.phi) if absorption_model else 1.0
+    d = detector_model.interp(tab.ix, tab.iy) if detector_model else 1.0
+    c = offset_model.interp(tab.s, tab.phi) if offset_model else 0.0
+    bg_rate = background.interpolate(tab.phi, tab.iy, tab.ix) if background else 0.0
+    tab.scale = tab.seconds * solid_angle * a * b * d
+    tab.background_counts = tab.seconds * (bg_rate + c * a * d * solid_angle)
+    tab = tab.to_asu(symmetry)
+    del tab.phi, tab.iy, tab.ix, tab.seconds, tab.s, tab.op, tab.pixels
+    return tab
+
+
 def run_reintegrate(params):
     logger.info("Loading geometry and image data...")
     miller_index = loadobj(params.geom, "miller_index")
@@ -77,27 +162,6 @@ def run_reintegrate(params):
         detector_model = None
     mask = nxload(params.mask).entry.mask.signal if params.mask else None
 
-    def calc_corrections(tab):
-        UB = crystal.ub_matrix
-        s = UB @ np.stack((tab.h, tab.k, tab.l))
-        tab.s = np.sqrt(np.sum(s * s, axis=0))
-        correction_factors = corrections.interpolate(tab.iy, tab.ix)
-        solid_angle = correction_factors["solid_angle"]
-        solid_angle *= correction_factors["attenuation"]
-        solid_angle *= correction_factors["polarization"]
-        solid_angle *= correction_factors["efficiency"]
-        tab.multiplicity = tab.pixels * correction_factors["d3s"] * np.prod(tab.ndiv) / np.linalg.det(UB)
-        b = scaling_model.interp(tab.phi) if scaling_model else 1.0
-        a = absorption_model.interp(tab.ix, tab.iy, tab.phi) if absorption_model else 1.0
-        d = detector_model.interp(tab.ix, tab.iy) if detector_model else 1.0
-        c = offset_model.interp(tab.s, tab.phi) if offset_model else 0.0
-        bg_rate = background.interpolate(tab.phi, tab.iy, tab.ix) if background else 0.0
-        tab.scale = tab.seconds * solid_angle * a * b * d
-        tab.background_counts = tab.seconds * (bg_rate + c * a * d * solid_angle)
-        tab = tab.to_asu(symmetry)
-        del tab.phi, tab.iy, tab.ix, tab.seconds, tab.s, tab.op, tab.pixels
-        return tab
-
     def intchunk(sl):
         ims = image_series[sl]
         if mask is not None:
@@ -111,7 +175,17 @@ def run_reintegrate(params):
         tab.phi /= tab.pixels
         tab.iy /= tab.pixels
         tab.ix /= tab.pixels
-        tab = calc_corrections(tab)
+        tab = calc_corrections(
+            tab,
+            crystal,
+            corrections,
+            symmetry,
+            scaling_model,
+            absorption_model,
+            detector_model,
+            offset_model,
+            background,
+        )
         tab.h = tab.h.astype(np.float32)
         tab.k = tab.k.astype(np.float32)
         tab.l = tab.l.astype(np.float32)
