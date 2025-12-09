@@ -5,7 +5,6 @@ from cctbx.eltbx import attenuation_coefficient
 from dxtbx import flumpy
 from dxtbx.format.FormatPilatusHelpers import _get_pad_module_gap
 from dxtbx.model.experiment_list import ExperimentList
-from loguru import logger
 from scitbx import matrix
 
 
@@ -306,7 +305,6 @@ class ImageSet:
 
     def read_frame(self, ind, maskval=-1):
         # for now, apply mask by default and return just the image as an ndarray
-        logger.debug(f"{self.__class__.__name__}: reading frame {ind}")
         im = self._iset.get_raw_data(ind)[0]
         msk = self._iset.get_mask(ind)[0]
         msk = ~msk
