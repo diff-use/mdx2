@@ -3,6 +3,7 @@ Import experimental geometry using the dxtbx machinery
 """
 
 from dataclasses import dataclass
+from typing import Tuple
 
 from loguru import logger
 from simple_parsing import ArgumentParser, field
@@ -17,7 +18,7 @@ class Parameters:
     """Options for importing experimental geometry"""
 
     expt: str = field(positional=True)  # dials experiments file, such as refined.expt
-    sample_spacing: tuple[int, int, int] = (1, 10, 10)  # interval in degrees or pixels (phi, iy, ix)
+    sample_spacing: Tuple[int, int, int] = (1, 10, 10)  # interval in degrees or pixels (phi, iy, ix)
     outfile: str = "geometry.nxs"  # name of the output NeXus file
 
 
