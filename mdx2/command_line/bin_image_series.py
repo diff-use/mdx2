@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 from joblib import Parallel, delayed
+from joblib.parallel import get_active_backend
 from loguru import logger
 from simple_parsing import ArgumentParser, field
 
@@ -92,12 +93,13 @@ def run_bin_image_series(params):
         return outslab
 
     with Parallel(n_jobs=nproc, verbose=10) as parallel:
-        backend_name = parallel._backend.__class__.__name__
+        backend, n_jobs = get_active_backend()
+        backend_name = backend.__class__.__name__
         logger.info(
-            "Binning {} image slabs using {} processes (backend: {})...",
+            "Binning {} image slabs (backend: {}, n_jobs: {})...",
             len(sl_0),
-            nproc,
             backend_name,
+            n_jobs,
         )
         new_data = np.stack(parallel(delayed(binslab)(sl) for sl in sl_0))
 

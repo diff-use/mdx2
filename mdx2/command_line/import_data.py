@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from joblib import Parallel, delayed
+from joblib.parallel import get_active_backend
 from loguru import logger
 from simple_parsing import ArgumentParser, field
 
@@ -72,12 +73,13 @@ def run_import_data(params):
     files = nxobj.data._vfiles
 
     with Parallel(n_jobs=nproc, verbose=10) as parallel:
-        backend_name = parallel._backend.__class__.__name__
+        backend, n_jobs = get_active_backend()
+        backend_name = backend.__class__.__name__
         logger.info(
-            "Writing {} image batches using {} processes (backend: {})...",
+            "Writing {} image batches (backend: {}, n_jobs: {})...",
             len(slices),
-            nproc,
             backend_name,
+            n_jobs,
         )
         parallel(delayed(write_stack)(sl.start, sl.stop, fn, nxobj.data._vpath) for sl, fn in zip(slices, files))
 

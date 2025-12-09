@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 from joblib import Parallel, delayed
+from joblib.parallel import get_active_backend
 from loguru import logger
 from simple_parsing import ArgumentParser, field
 
@@ -73,12 +74,13 @@ def run_integrate(params):
 
     slices = list(IS.chunk_slice_iterator())
     with Parallel(n_jobs=nproc, verbose=10) as parallel:
-        backend_name = parallel._backend.__class__.__name__
+        backend, n_jobs = get_active_backend()
+        backend_name = backend.__class__.__name__
         logger.info(
-            "Integrating {} image chunks using {} processes (backend: {})...",
+            "Integrating {} image chunks (backend: {}, n_jobs: {})...",
             len(slices),
-            nproc,
             backend_name,
+            n_jobs,
         )
         T = parallel(delayed(intchunk)(sl) for sl in slices)
 

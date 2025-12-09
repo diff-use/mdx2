@@ -7,6 +7,7 @@ from typing import Literal, Optional, Tuple
 
 import numpy as np
 from joblib import Parallel, delayed
+from joblib.parallel import get_active_backend
 from loguru import logger
 from simple_parsing import ArgumentParser, field
 
@@ -128,12 +129,13 @@ def run_reintegrate(params):
 
     slices = list(image_series.chunk_slice_iterator())
     with Parallel(n_jobs=params.nproc, verbose=10, return_as="generator_unordered") as parallel:
-        backend_name = parallel._backend.__class__.__name__
+        backend, n_jobs = get_active_backend()
+        backend_name = backend.__class__.__name__
         logger.info(
-            "Reintegrating {} image chunks using {} processes (backend: {})...",
+            "Reintegrating {} image chunks (backend: {}, n_jobs: {})...",
             len(slices),
-            params.nproc,
             backend_name,
+            n_jobs,
         )
         tab_chunk = parallel(delayed(intchunk)(sl) for sl in slices)
         for tab in tab_chunk:
