@@ -7,11 +7,10 @@ from typing import Optional, Tuple
 
 import numpy as np
 from joblib import Parallel, delayed
-from joblib.parallel import get_active_backend
 from loguru import logger
 from simple_parsing import ArgumentParser, field
 
-from mdx2.command_line import with_logging
+from mdx2.command_line import log_parallel_backend, with_logging
 from mdx2.geometry import GridData
 from mdx2.utils import (
     loadobj,
@@ -98,16 +97,11 @@ def run_bin_image_series(params):
                 outslab[ind_y, ind_x] = val
         return outslab
 
+    logger.info("Binning {} image slabs (requested n_jobs: {})...", len(sl_0), nproc)
     with Parallel(n_jobs=nproc, verbose=10) as parallel:
-        backend, n_jobs = get_active_backend()
-        backend_name = backend.__class__.__name__
-        logger.info(
-            "Binning {} image slabs (backend: {}, n_jobs: {})...",
-            len(sl_0),
-            backend_name,
-            n_jobs,
-        )
+        log_parallel_backend(parallel)
         new_data = np.stack(parallel(delayed(binslab)(sl) for sl in sl_0))
+    logger.info("Binning computation completed")
 
     # Convert to count rate if requested
     new_times = np.array([image_series.exposure_times[sl].mean() for sl in sl_0])

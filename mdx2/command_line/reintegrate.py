@@ -7,11 +7,10 @@ from typing import Literal, Optional, Tuple
 
 import numpy as np
 from joblib import Parallel, delayed
-from joblib.parallel import get_active_backend
 from loguru import logger
 from simple_parsing import ArgumentParser, field
 
-from mdx2.command_line import with_logging
+from mdx2.command_line import log_parallel_backend, with_logging
 from mdx2.data import HKLGrid, HKLTable
 from mdx2.utils import (
     loadobj,
@@ -128,20 +127,15 @@ def run_reintegrate(params):
     grid = HKLGrid(data_arrays, ndiv=params.subdivide, ori=array_ori)
 
     slices = list(image_series.chunk_slice_iterator())
+    logger.info("Reintegrating {} image chunks (requested n_jobs: {})...", len(slices), params.nproc)
     with Parallel(n_jobs=params.nproc, verbose=10, return_as="generator_unordered") as parallel:
-        backend, n_jobs = get_active_backend()
-        backend_name = backend.__class__.__name__
-        logger.info(
-            "Reintegrating {} image chunks (backend: {}, n_jobs: {})...",
-            len(slices),
-            backend_name,
-            n_jobs,
-        )
+        log_parallel_backend(parallel)
         tab_chunk = parallel(delayed(intchunk)(sl) for sl in slices)
         for tab in tab_chunk:
             if tab is None:
                 continue
             grid.accumulate_from_table(tab, resize=False)
+    logger.info("Reintegration completed")
 
     logger.info("Converting grid to sparse table...")
     hkl_table = grid.to_table(sparse=True)

@@ -6,11 +6,10 @@ from dataclasses import dataclass
 
 import numpy as np
 from joblib import Parallel, delayed
-from joblib.parallel import get_active_backend
 from loguru import logger
 from simple_parsing import ArgumentParser, field  # pip install simple-parsing
 
-from mdx2.command_line import with_logging
+from mdx2.command_line import log_parallel_backend, with_logging
 from mdx2.geometry import GridData
 from mdx2.utils import loadobj, saveobj
 
@@ -68,16 +67,11 @@ def run_mask_peaks(params):
         return isrefl & GP.mask(dh, dk, dl, sigma_cutoff=sigma_cutoff)
 
     slices = list(IS.chunk_slice_iterator())
+    logger.info("Computing peak mask for {} image chunks (requested n_jobs: {})...", len(slices), nproc)
     with Parallel(n_jobs=nproc, verbose=10) as parallel:
-        backend, n_jobs = get_active_backend()
-        backend_name = backend.__class__.__name__
-        logger.info(
-            "Computing peak mask for {} image chunks (backend: {}, n_jobs: {})...",
-            len(slices),
-            backend_name,
-            n_jobs,
-        )
+        log_parallel_backend(parallel)
         masklist = parallel(delayed(maskchunk)(sl) for sl in slices)
+    logger.info("Mask computation completed")
     for msk, sl in zip(masklist, slices):
         mask[sl] = msk  # <-- note, this copy step could be avoided with shared mem
 

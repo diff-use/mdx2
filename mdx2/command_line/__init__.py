@@ -8,6 +8,28 @@ from functools import wraps
 from loguru import logger
 
 
+def log_parallel_backend(parallel):
+    """
+    Log information about the active joblib Parallel backend.
+
+    Attempts to access backend information via private API. If this fails
+    (e.g., due to API changes), logs a warning but does not raise an error.
+
+    Parameters
+    ----------
+    parallel : joblib.Parallel
+        The Parallel instance to inspect
+    """
+    try:
+        if hasattr(parallel, "_backend") and parallel._backend:
+            backend_name = parallel._backend.__class__.__name__
+        else:
+            backend_name = "Unknown"
+        logger.info("Using backend: {}, n_jobs: {}", backend_name, parallel.n_jobs)
+    except Exception as e:
+        logger.warning("Could not determine joblib backend details: {}", e)
+
+
 def with_logging(log_filename=None, log_level="INFO"):
     """
     Decorator to set up logging for command-line tools.

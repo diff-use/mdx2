@@ -7,11 +7,10 @@ from typing import Optional, Tuple
 
 import numpy as np
 from joblib import Parallel, delayed
-from joblib.parallel import get_active_backend
 from loguru import logger
 from simple_parsing import ArgumentParser, field
 
-from mdx2.command_line import with_logging
+from mdx2.command_line import log_parallel_backend, with_logging
 from mdx2.data import HKLTable
 from mdx2.utils import (
     loadobj,
@@ -73,16 +72,11 @@ def run_integrate(params):
         return tab.bin(count_name="pixels")
 
     slices = list(IS.chunk_slice_iterator())
+    logger.info("Integrating {} image chunks (requested n_jobs: {})...", len(slices), nproc)
     with Parallel(n_jobs=nproc, verbose=10) as parallel:
-        backend, n_jobs = get_active_backend()
-        backend_name = backend.__class__.__name__
-        logger.info(
-            "Integrating {} image chunks (backend: {}, n_jobs: {})...",
-            len(slices),
-            backend_name,
-            n_jobs,
-        )
+        log_parallel_backend(parallel)
         T = parallel(delayed(intchunk)(sl) for sl in slices)
+    logger.info("Integration completed")
 
     logger.info("Summing partial observations over {} chunks...", len(T))
 

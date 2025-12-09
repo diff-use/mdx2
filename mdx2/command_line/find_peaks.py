@@ -6,11 +6,10 @@ from dataclasses import dataclass
 
 import numpy as np
 from joblib import Parallel, delayed
-from joblib.parallel import get_active_backend
 from loguru import logger
 from simple_parsing import ArgumentParser, field  # pip install simple-parsing
 
-from mdx2.command_line import with_logging
+from mdx2.command_line import log_parallel_backend, with_logging
 from mdx2.data import Peaks
 from mdx2.geometry import GaussianPeak
 from mdx2.utils import loadobj, saveobj
@@ -60,16 +59,11 @@ def run_find_peaks(params):
             return peaks
 
     slices = list(IS.chunk_slice_iterator())
+    logger.info("Searching for peaks in {} image chunks (requested n_jobs: {})...", len(slices), nproc)
     with Parallel(n_jobs=nproc, verbose=10) as parallel:
-        backend, n_jobs = get_active_backend()
-        backend_name = backend.__class__.__name__
-        logger.info(
-            "Searching for peaks in {} image chunks (backend: {}, n_jobs: {})...",
-            len(slices),
-            backend_name,
-            n_jobs,
-        )
+        log_parallel_backend(parallel)
         peaklist = parallel(delayed(peaksearch)(sl) for sl in slices)
+    logger.info("Peak search completed")
 
     P = Peaks.stack([p for p in peaklist if p is not None])
     logger.info("Found {} peak pixels", P.size)

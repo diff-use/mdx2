@@ -6,11 +6,10 @@ from dataclasses import dataclass
 from typing import Optional
 
 from joblib import Parallel, delayed
-from joblib.parallel import get_active_backend
 from loguru import logger
 from simple_parsing import ArgumentParser, field
 
-from mdx2.command_line import with_logging
+from mdx2.command_line import log_parallel_backend, with_logging
 from mdx2.data import ImageSeries
 from mdx2.dxtbx_machinery import ImageSet
 from mdx2.utils import nxload
@@ -72,16 +71,11 @@ def run_import_data(params):
     slices = [sl for sl in image_series.chunk_slice_along_axis(0)]
     files = nxobj.data._vfiles
 
+    logger.info("Writing {} image batches (requested n_jobs: {})...", len(slices), nproc)
     with Parallel(n_jobs=nproc, verbose=10) as parallel:
-        backend, n_jobs = get_active_backend()
-        backend_name = backend.__class__.__name__
-        logger.info(
-            "Writing {} image batches (backend: {}, n_jobs: {})...",
-            len(slices),
-            backend_name,
-            n_jobs,
-        )
+        log_parallel_backend(parallel)
         parallel(delayed(write_stack)(sl.start, sl.stop, fn, nxobj.data._vpath) for sl, fn in zip(slices, files))
+    logger.info("Image data writing completed")
 
     logger.info("Image data import completed successfully")
 
