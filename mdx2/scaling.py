@@ -1028,6 +1028,20 @@ class BatchModelRefiner:
 
         self.detector = DetectorModelRefiner(data, detector_model)
 
+    @property
+    def batch_refiners(self):
+        """Access individual batch model refiners.
+
+        Returns an iterator over CombinedModelRefiner instances, one per batch.
+        This allows external code to iterate over refiners or access their models
+        without directly coupling to the internal _batch_refiners implementation.
+
+        Example:
+            for refiner in batch_model_refiner.batch_refiners:
+                model = refiner.scaling.model
+        """
+        return iter(self._batch_refiners)
+
     def add_scaling_models(self, *args, **kwargs):
         [br.scaling.add_model(*args, **kwargs) for br in self._batch_refiners]
 

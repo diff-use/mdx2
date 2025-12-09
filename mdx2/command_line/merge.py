@@ -116,7 +116,7 @@ def run_merge(params):
 
     if scale is not None:
         logger.info("Loading scaling models...")
-        for fn, refiner in zip(scale, MR._batch_refiners):
+        for fn, refiner in zip(scale, MR.batch_refiners):
             a = nxload(fn)
             if apply_absorption and ("absorption_model" in a.entry.keys()):
                 refiner.absorption.model = loadobj(fn, "absorption_model")

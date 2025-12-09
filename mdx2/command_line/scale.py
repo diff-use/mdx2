@@ -342,7 +342,7 @@ def run_scale(params):
         S_pre = load_data_for_scaling(*params.hkl, subsample=subsample, merge_isotropic=params.prescale.isotropic)
         MR_pre = BatchModelRefiner(S_pre)
         # transfer models to prescaling refiner
-        for model_refiner, model_refiner_pre in zip(MR._batch_refiners, MR_pre._batch_refiners):
+        for model_refiner, model_refiner_pre in zip(MR.batch_refiners, MR_pre.batch_refiners):
             model_refiner_pre.scaling.model = model_refiner.scaling.model
             model_refiner_pre.offset.model = model_refiner.offset.model
             model_refiner_pre.detector.model = model_refiner.detector.model
@@ -401,7 +401,7 @@ def run_scale(params):
     logger.info("Refinement completed")
 
     logger.info("Saving scaling models...")
-    for model_refiner, fn in zip(MR._batch_refiners, params.outfile):
+    for model_refiner, fn in zip(MR.batch_refiners, params.outfile):
         models = dict(
             scaling_model=model_refiner.scaling.model,
             detector_model=model_refiner.detector.model,
