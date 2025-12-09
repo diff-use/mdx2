@@ -87,7 +87,7 @@ def run_correct(params):
         logger.info("Subtracting background from count rate")
         count_rate = count_rate - bkg_count_rate
 
-    solid_angle = Cinterp["solid_angle"]
+    solid_angle = Cinterp["solid_angle"].copy()
 
     corrections_applied = []
     if attenuation:
