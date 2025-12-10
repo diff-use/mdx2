@@ -57,7 +57,7 @@ def run_import_data(params):
         logger.info("Using chunking: {}", chunks)
 
     logger.info("Creating virtual dataset structure...")
-    nxobj = image_series.save(
+    image_series.save(
         outfile,
         virtual=True,
         source_directory=datastore,
@@ -69,15 +69,24 @@ def run_import_data(params):
         source[:, :, :] = data
 
     slices = [sl for sl in image_series.chunk_slice_along_axis(0)]
-    # NOTE: Accessing private h5py virtual dataset attributes (_vfiles, _vpath) exposed through
-    # nexusformat. These are implementation details that may change with h5py/nexusformat updates.
-    # This dependency should be validated when updating those packages.
-    files = nxobj.data._vfiles
+
+    # Access virtual dataset information through public API
+    # Reload the ImageSeries to ensure we have the updated virtual dataset
+    image_series_reloaded = ImageSeries.load(outfile)
+    files = image_series_reloaded.virtual_source_files
+    vpath = image_series_reloaded.virtual_dataset_path
+
+    # Properties will raise RuntimeError if internal API has changed
+    # If data is not a virtual dataset, they return None
+    if files is None or vpath is None:
+        raise RuntimeError(
+            f"Expected virtual dataset in {outfile}, but virtual dataset information is not available."
+        )
 
     logger.info("Writing {} image batches (requested n_jobs: {})...", len(slices), nproc)
     with Parallel(n_jobs=nproc, verbose=10) as parallel:
         log_parallel_backend(parallel)
-        parallel(delayed(write_stack)(sl.start, sl.stop, fn, nxobj.data._vpath) for sl, fn in zip(slices, files))
+        parallel(delayed(write_stack)(sl.start, sl.stop, fn, vpath) for sl, fn in zip(slices, files))
     logger.info("Image data writing completed")
 
     logger.info("Image data import completed successfully")

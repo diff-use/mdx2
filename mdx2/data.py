@@ -503,10 +503,87 @@ class ImageSeries:
         return np.ma.masked_equal(self._as_np(self.data), self._maskval, copy=False)
 
     @property
+    def virtual_source_files(self):
+        """Get list of source files for virtual dataset.
+
+        Returns
+        -------
+        list of str or None
+            List of file paths if data is a virtual dataset, None otherwise.
+
+        Raises
+        ------
+        RuntimeError
+            If the data is a virtual dataset but the internal API has changed.
+
+        Notes
+        -----
+        This property provides safe access to h5py/nexusformat internal attributes.
+        Returns None if the data is not a virtual dataset.
+        """
+        if isinstance(self.data, NXvirtualfield):
+            try:
+                return self.data._vfiles
+            except AttributeError:
+                # Internal API changed - this is a programming error
+                raise RuntimeError(
+                    "Unable to access virtual dataset source files. "
+                    "The nexusformat/h5py internal API may have changed."
+                )
+        return None
+
+    @property
+    def virtual_dataset_path(self):
+        """Get the HDF5 path to the virtual dataset.
+
+        Returns
+        -------
+        str or None
+            HDF5 path if data is a virtual dataset, None otherwise.
+
+        Raises
+        ------
+        RuntimeError
+            If the data is a virtual dataset but the internal API has changed.
+
+        Notes
+        -----
+        This property provides safe access to h5py/nexusformat internal attributes.
+        Returns None if the data is not a virtual dataset.
+        """
+        if isinstance(self.data, NXvirtualfield):
+            try:
+                return self.data._vpath
+            except AttributeError:
+                # Internal API changed - this is a programming error
+                raise RuntimeError(
+                    "Unable to access virtual dataset HDF5 path. "
+                    "The nexusformat/h5py internal API may have changed."
+                )
+        return None
+
+    @property
     def chunks(self):
         if isinstance(self.data, NXvirtualfield):
-            with h5py.File(self.data._vfiles[0], "r") as f:
-                ch = f[self.data._vpath].chunks
+            try:
+                with h5py.File(self.data._vfiles[0], "r") as f:
+                    ch = f[self.data._vpath].chunks
+            except AttributeError:
+                # Internal API changed - this is a programming error
+                raise RuntimeError(
+                    "Unable to access virtual dataset source files. "
+                    "The nexusformat/h5py internal API may have changed."
+                )
+            except KeyError:
+                # Dataset path doesn't exist in source file
+                raise RuntimeError(
+                    f"Virtual dataset path '{self.data._vpath}' not found in source file '{self.data._vfiles[0]}'"
+                )
+            except (OSError, IOError) as e:
+                # File access error - source file missing or inaccessible
+                raise FileNotFoundError(
+                    f"Cannot access virtual dataset source file '{self.data._vfiles[0]}': {e}"
+                )
         elif isinstance(self.data, NXfield):
             ch = self.data.chunks
         else:
