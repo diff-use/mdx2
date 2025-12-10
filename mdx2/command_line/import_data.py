@@ -79,9 +79,7 @@ def run_import_data(params):
     # Properties will raise RuntimeError if internal API has changed
     # If data is not a virtual dataset, they return None
     if files is None or vpath is None:
-        raise RuntimeError(
-            f"Expected virtual dataset in {outfile}, but virtual dataset information is not available."
-        )
+        raise RuntimeError(f"Expected virtual dataset in {outfile}, but virtual dataset information is not available.")
 
     logger.info("Writing {} image batches (requested n_jobs: {})...", len(slices), nproc)
     with Parallel(n_jobs=nproc, verbose=10) as parallel:

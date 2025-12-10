@@ -527,8 +527,7 @@ class ImageSeries:
             except AttributeError:
                 # Internal API changed - this is a programming error
                 raise RuntimeError(
-                    "Unable to access virtual dataset source files. "
-                    "The nexusformat/h5py internal API may have changed."
+                    "Unable to access virtual dataset source files. The nexusformat/h5py internal API may have changed."
                 )
         return None
 
@@ -557,8 +556,7 @@ class ImageSeries:
             except AttributeError:
                 # Internal API changed - this is a programming error
                 raise RuntimeError(
-                    "Unable to access virtual dataset HDF5 path. "
-                    "The nexusformat/h5py internal API may have changed."
+                    "Unable to access virtual dataset HDF5 path. The nexusformat/h5py internal API may have changed."
                 )
         return None
 
@@ -571,8 +569,7 @@ class ImageSeries:
             except AttributeError:
                 # Internal API changed - this is a programming error
                 raise RuntimeError(
-                    "Unable to access virtual dataset source files. "
-                    "The nexusformat/h5py internal API may have changed."
+                    "Unable to access virtual dataset source files. The nexusformat/h5py internal API may have changed."
                 )
             except KeyError:
                 # Dataset path doesn't exist in source file
@@ -581,9 +578,7 @@ class ImageSeries:
                 )
             except (OSError, IOError) as e:
                 # File access error - source file missing or inaccessible
-                raise FileNotFoundError(
-                    f"Cannot access virtual dataset source file '{self.data._vfiles[0]}': {e}"
-                )
+                raise FileNotFoundError(f"Cannot access virtual dataset source file '{self.data._vfiles[0]}': {e}")
         elif isinstance(self.data, NXfield):
             ch = self.data.chunks
         else:
