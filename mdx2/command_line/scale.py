@@ -115,6 +115,12 @@ class Parameters:
             if self.outfile is None:
                 raise ValueError("unable to auto-generate output file names from input name pattern")
 
+        # Validate that the number of output files matches the number of input files
+        if len(self.outfile) != len(self.hkl):
+            raise ValueError(
+                f"Number of output files ({len(self.outfile)}) must match number of input files ({len(self.hkl)})"
+            )
+
 
 def generate_default_outfiles(infiles):
     """Generate default output file names based on input file names.

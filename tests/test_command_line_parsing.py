@@ -642,6 +642,17 @@ def test_integrate_parse_arguments(args, expected, raises):
             },
             None,
         ),
+        # Invalid case: mismatched number of input and output files
+        (
+            [
+                "integrated_1.nxs",
+                "integrated_2.nxs",
+                "--outfile",
+                "scales.nxs",
+            ],
+            None,
+            ValueError,
+        ),
     ],
 )
 def test_scale_parse_arguments(args, expected, raises):
