@@ -1,12 +1,14 @@
 import pytest
 
 from mdx2.command_line.bin_image_series import parse_arguments as bin_image_series_parse_arguments
+from mdx2.command_line.correct import parse_arguments as correct_parse_arguments
 from mdx2.command_line.find_peaks import parse_arguments as find_peaks_parse_arguments
 from mdx2.command_line.import_data import parse_arguments as import_data_parse_arguments
 from mdx2.command_line.import_geometry import parse_arguments as import_geometry_parse_arguments
 from mdx2.command_line.integrate import parse_arguments as integrate_parse_arguments
 from mdx2.command_line.mask_peaks import parse_arguments as mask_peaks_parse_arguments
 from mdx2.command_line.merge import parse_arguments as merge_parse_arguments
+from mdx2.command_line.reintegrate import parse_arguments as reintegrate_parse_arguments
 from mdx2.command_line.scale import parse_arguments as scale_parse_arguments
 
 
@@ -671,3 +673,258 @@ def test_scale_parse_arguments(args, expected, raises):
         assert params.absorption.x2tol == expected["absorption.x2tol"]
         assert params.absorption.outlier == expected["absorption.outlier"]
         assert params.outfile == expected["outfile"]
+
+
+@pytest.mark.parametrize(
+    "args,expected,raises",
+    [
+        # Valid case with background
+        (
+            [
+                "geom.nxs",
+                "integrated.nxs",
+                "--background",
+                "background.nxs",
+                "--outfile",
+                "corrected.nxs",
+            ],
+            {
+                "geom": "geom.nxs",
+                "hkl": "integrated.nxs",
+                "background": "background.nxs",
+                "attenuation": True,
+                "efficiency": True,
+                "polarization": True,
+                "lorentz": False,
+                "p1": False,
+                "outfile": "corrected.nxs",
+            },
+            None,
+        ),
+        # Valid case without background
+        (
+            [
+                "geom.nxs",
+                "integrated.nxs",
+                "--outfile",
+                "corrected.nxs",
+            ],
+            {
+                "geom": "geom.nxs",
+                "hkl": "integrated.nxs",
+                "background": None,
+                "attenuation": True,
+                "efficiency": True,
+                "polarization": True,
+                "lorentz": False,
+                "p1": False,
+                "outfile": "corrected.nxs",
+            },
+            None,
+        ),
+        # Valid case with correction flags
+        (
+            [
+                "geom.nxs",
+                "integrated.nxs",
+                "--background",
+                "background.nxs",
+                "--lorentz",
+                "True",
+                "--p1",
+                "True",
+                "--attenuation",
+                "False",
+                "--outfile",
+                "corrected.nxs",
+            ],
+            {
+                "geom": "geom.nxs",
+                "hkl": "integrated.nxs",
+                "background": "background.nxs",
+                "attenuation": False,
+                "efficiency": True,
+                "polarization": True,
+                "lorentz": True,
+                "p1": True,
+                "outfile": "corrected.nxs",
+            },
+            None,
+        ),
+        # Missing required argument
+        (
+            ["geom.nxs"],
+            None,
+            SystemExit,
+        ),
+    ],
+)
+def test_correct_parse_arguments(args, expected, raises):
+    """Test the correct command line argument parsing."""
+    if raises:
+        with pytest.raises(raises):
+            correct_parse_arguments(args=args)
+    else:
+        params = correct_parse_arguments(args=args)
+        assert params.geom == expected["geom"]
+        assert params.hkl == expected["hkl"]
+        assert params.background == expected["background"]
+        assert params.attenuation == expected["attenuation"]
+        assert params.efficiency == expected["efficiency"]
+        assert params.polarization == expected["polarization"]
+        assert params.lorentz == expected["lorentz"]
+        assert params.p1 == expected["p1"]
+        assert params.outfile == expected["outfile"]
+
+
+@pytest.mark.parametrize(
+    "args,expected,raises",
+    [
+        # Valid case with both mask and background
+        (
+            [
+                "geom.nxs",
+                "data.nxs",
+                "--mask",
+                "mask.nxs",
+                "--scale",
+                "scales.nxs",
+                "--background",
+                "background.nxs",
+                "--subdivide",
+                "2",
+                "2",
+                "2",
+                "--output",
+                "counts",
+                "--outfile",
+                "reintegrated.nxs",
+                "--nproc",
+                "4",
+            ],
+            {
+                "geom": "geom.nxs",
+                "data": "data.nxs",
+                "mask": "mask.nxs",
+                "scale": "scales.nxs",
+                "background": "background.nxs",
+                "subdivide": (2, 2, 2),
+                "output": "counts",
+                "outfile": "reintegrated.nxs",
+                "nproc": 4,
+            },
+            None,
+        ),
+        # Valid case with mask but no background
+        (
+            [
+                "geom.nxs",
+                "data.nxs",
+                "--mask",
+                "mask.nxs",
+                "--scale",
+                "scales.nxs",
+                "--subdivide",
+                "2",
+                "2",
+                "2",
+                "--outfile",
+                "reintegrated.nxs",
+                "--nproc",
+                "4",
+            ],
+            {
+                "geom": "geom.nxs",
+                "data": "data.nxs",
+                "mask": "mask.nxs",
+                "scale": "scales.nxs",
+                "background": None,
+                "subdivide": (2, 2, 2),
+                "output": "counts",
+                "outfile": "reintegrated.nxs",
+                "nproc": 4,
+            },
+            None,
+        ),
+        # Valid case with background but no mask
+        (
+            [
+                "geom.nxs",
+                "data.nxs",
+                "--scale",
+                "scales.nxs",
+                "--background",
+                "background.nxs",
+                "--subdivide",
+                "2",
+                "2",
+                "2",
+                "--outfile",
+                "reintegrated.nxs",
+                "--nproc",
+                "4",
+            ],
+            {
+                "geom": "geom.nxs",
+                "data": "data.nxs",
+                "mask": None,
+                "scale": "scales.nxs",
+                "background": "background.nxs",
+                "subdivide": (2, 2, 2),
+                "output": "counts",
+                "outfile": "reintegrated.nxs",
+                "nproc": 4,
+            },
+            None,
+        ),
+        # Valid case with neither mask nor background
+        (
+            [
+                "geom.nxs",
+                "data.nxs",
+                "--subdivide",
+                "2",
+                "2",
+                "2",
+                "--outfile",
+                "reintegrated.nxs",
+                "--nproc",
+                "4",
+            ],
+            {
+                "geom": "geom.nxs",
+                "data": "data.nxs",
+                "mask": None,
+                "scale": None,
+                "background": None,
+                "subdivide": (2, 2, 2),
+                "output": "counts",
+                "outfile": "reintegrated.nxs",
+                "nproc": 4,
+            },
+            None,
+        ),
+        # Missing required argument
+        (
+            ["geom.nxs"],
+            None,
+            SystemExit,
+        ),
+    ],
+)
+def test_reintegrate_parse_arguments(args, expected, raises):
+    """Test the reintegrate command line argument parsing."""
+    if raises:
+        with pytest.raises(raises):
+            reintegrate_parse_arguments(args=args)
+    else:
+        params = reintegrate_parse_arguments(args=args)
+        assert params.geom == expected["geom"]
+        assert params.data == expected["data"]
+        assert params.mask == expected["mask"]
+        assert params.scale == expected["scale"]
+        assert params.background == expected["background"]
+        assert tuple(params.subdivide) == expected["subdivide"]
+        assert params.output == expected["output"]
+        assert params.outfile == expected["outfile"]
+        assert params.nproc == expected["nproc"]
