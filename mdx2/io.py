@@ -47,10 +47,8 @@ def loadobj(filename, objectname):
     # simple wrapper to load mdx2 objects from nxs files
     # handles import using the mdx2_module and mdx2_class attributes
     # does a from_nexus() call to instantiate the class
+    # Note: version checking is handled by nxload()
     nxroot = nxload(filename, "r")
-    mdx2_version_file = nxroot.attrs.get("mdx2_version")
-    if mdx2_version_file != mdx2.__version__:
-        pass  # TODO: handle version mismatch
     nxs = nxroot["/entry/" + objectname]
     mod = nxs.attrs["mdx2_module"]
     cls = nxs.attrs["mdx2_class"]
