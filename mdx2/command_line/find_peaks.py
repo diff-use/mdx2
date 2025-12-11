@@ -68,8 +68,7 @@ def run_find_peaks(params):
     peaks_nonempty = [p for p in peaklist if p is not None]
     if not peaks_nonempty:
         raise ValueError(
-            f"No peaks found above threshold {count_threshold}. "
-            f"Try lowering the threshold or check your data."
+            f"No peaks found above threshold {count_threshold}. Try lowering the threshold or check your data."
         )
     P = Peaks.stack(peaks_nonempty)
     logger.info("Found {} peak pixels", P.size)

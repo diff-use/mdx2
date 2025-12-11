@@ -8,7 +8,6 @@ import pytest
 from mdx2.data import ImageSeries
 from mdx2.io import loadobj, nxsave, saveobj
 
-
 # Create a test module with a class that lacks from_nexus method for security testing
 _test_module = types.ModuleType("mdx2.test_no_from_nexus")
 _test_module.ClassWithoutFromNexus = type("ClassWithoutFromNexus", (), {})
