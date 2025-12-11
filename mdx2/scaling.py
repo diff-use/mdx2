@@ -148,6 +148,7 @@ class InterpLin3:
         L = sparse.coo_matrix((vals, (row_index, col_index)), shape=shape)
 
         # Weight according to number of neighbors
+        # NOTE: this may fail if Nx=Ny=Nz=1
         nn = np.asarray(L.sum(axis=1)).flatten()
         W = sparse.diags(1 / nn)
         L = W @ L
