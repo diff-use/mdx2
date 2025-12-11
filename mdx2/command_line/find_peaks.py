@@ -7,9 +7,9 @@ from dataclasses import dataclass
 import numpy as np
 from joblib import Parallel, delayed
 from loguru import logger
-from simple_parsing import ArgumentParser, field  # pip install simple-parsing
+from simple_parsing import field  # pip install simple-parsing
 
-from mdx2.command_line import log_parallel_backend, with_logging
+from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging
 from mdx2.data import Peaks
 from mdx2.geometry import GaussianPeak
 from mdx2.io import loadobj, saveobj
@@ -27,12 +27,7 @@ class Parameters:
     nproc: int = 1  # number of parallel processes
 
 
-def parse_arguments(args=None):
-    """Parse commandline arguments"""
-    parser = ArgumentParser(description=__doc__)
-    parser.add_arguments(Parameters, dest="parameters")
-    opts = parser.parse_args(args)
-    return opts.parameters
+parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def run_find_peaks(params):

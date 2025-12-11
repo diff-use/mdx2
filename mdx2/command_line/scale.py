@@ -8,9 +8,9 @@ from typing import List, Optional
 
 import numpy as np
 from loguru import logger
-from simple_parsing import ArgumentGenerationMode, ArgumentParser, NestedMode, field
+from simple_parsing import field
 
-from mdx2.command_line import with_logging
+from mdx2.command_line import make_argument_parser, with_logging
 from mdx2.data import HKLTable
 from mdx2.io import loadobj, saveobj
 from mdx2.scaling import BatchModelRefiner, ScaledData
@@ -144,16 +144,7 @@ def generate_default_outfiles(infiles):
     return None
 
 
-def parse_arguments(args=None):
-    """Parse commandline arguments"""
-    parser = ArgumentParser(
-        description=__doc__,
-        argument_generation_mode=ArgumentGenerationMode.NESTED,
-        nested_mode=NestedMode.WITHOUT_ROOT,
-    )
-    parser.add_arguments(Parameters, dest="parameters")
-    opts = parser.parse_args(args)
-    return opts.parameters
+parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def mask_outliers(MR, outlier):

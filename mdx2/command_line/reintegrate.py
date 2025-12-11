@@ -8,9 +8,9 @@ from typing import Literal, Optional, Tuple
 import numpy as np
 from joblib import Parallel, delayed
 from loguru import logger
-from simple_parsing import ArgumentParser, field
+from simple_parsing import field
 
-from mdx2.command_line import log_parallel_backend, with_logging
+from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging
 from mdx2.data import HKLGrid, HKLTable
 from mdx2.io import (
     loadobj,
@@ -42,12 +42,7 @@ class Parameters:
     outfile: str = "reintegrated.nxs"  # name of the output data
 
 
-def parse_arguments(args=None):
-    """Parse commandline arguments"""
-    parser = ArgumentParser(description=__doc__)
-    parser.add_arguments(Parameters, dest="parameters")
-    opts = parser.parse_args(args)
-    return opts.parameters
+parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def calc_corrections(

@@ -7,9 +7,9 @@ from typing import Optional, Tuple
 
 from joblib import Parallel, delayed
 from loguru import logger
-from simple_parsing import ArgumentParser, field
+from simple_parsing import field
 
-from mdx2.command_line import log_parallel_backend, with_logging
+from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging
 from mdx2.data import ImageSeries
 from mdx2.dxtbx_machinery import ImageSet
 from mdx2.io import nxload
@@ -28,12 +28,7 @@ class Parameters:
     datastore: str = "datastore"  # folder for storing source datasets
 
 
-def parse_arguments(args=None):
-    """Parse commandline arguments"""
-    parser = ArgumentParser(description=__doc__)
-    parser.add_arguments(Parameters, dest="parameters")
-    opts = parser.parse_args(args)
-    return opts.parameters
+parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def run_import_data(params):

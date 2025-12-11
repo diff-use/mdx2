@@ -7,9 +7,9 @@ from typing import Optional
 
 import numpy as np
 from loguru import logger
-from simple_parsing import ArgumentParser, field  # pip install simple-parsing
+from simple_parsing import field  # pip install simple-parsing
 
-from mdx2.command_line import with_logging
+from mdx2.command_line import make_argument_parser, with_logging
 from mdx2.io import loadobj, saveobj
 
 
@@ -28,12 +28,7 @@ class Parameters:
     outfile: str = "corrected.nxs"  # name of the output NeXus file
 
 
-def parse_arguments(args=None):
-    """Parse commandline arguments"""
-    parser = ArgumentParser(description=__doc__)
-    parser.add_arguments(Parameters, dest="parameters")
-    opts = parser.parse_args(args)
-    return opts.parameters
+parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def run_correct(params):

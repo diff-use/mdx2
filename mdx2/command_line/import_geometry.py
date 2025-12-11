@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from loguru import logger
-from simple_parsing import ArgumentParser, field
+from simple_parsing import field
 
 import mdx2.geometry as geom
-from mdx2.command_line import with_logging
+from mdx2.command_line import make_argument_parser, with_logging
 from mdx2.io import saveobj
 
 
@@ -28,12 +28,7 @@ class Parameters:
                 raise ValueError(f"sample_spacing[{i}] must be positive, got {spacing}")
 
 
-def parse_arguments(args=None):
-    """Parse commandline arguments"""
-    parser = ArgumentParser(description=__doc__)
-    parser.add_arguments(Parameters, dest="parameters")
-    opts = parser.parse_args(args)
-    return opts.parameters
+parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def run_import_geometry(params):

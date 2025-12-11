@@ -6,6 +6,7 @@ from datetime import datetime
 from functools import wraps
 
 from loguru import logger
+from simple_parsing import ArgumentParser, ArgumentGenerationMode, NestedMode
 
 
 def log_parallel_backend(parallel):
@@ -28,6 +29,46 @@ def log_parallel_backend(parallel):
         logger.info("Using backend: {}, n_jobs: {}", backend_name, parallel.n_jobs)
     except Exception as e:
         logger.warning("Could not determine joblib backend details: {}", e)
+
+
+def make_argument_parser(params_class, description):
+    """
+    Create a standardized argument parser for a Parameters class.
+
+    This factory function generates a parse_arguments() function that can be used
+    in command-line modules. It uses a consistent ArgumentParser configuration
+    that supports both flat and nested dataclass parameters.
+
+    Args:
+        params_class: The Parameters dataclass for this command-line tool
+        description: Module docstring (__doc__)
+
+    Returns:
+        A parse_arguments(args=None) function that parses command-line arguments
+        and returns a Parameters instance
+
+    Example:
+        >>> @dataclass
+        >>> class Parameters:
+        >>>     input: str = field(positional=True)
+        >>>     count: int = 10
+        >>>
+        >>> parse_arguments = make_argument_parser(Parameters, __doc__)
+        >>> params = parse_arguments(["input.txt", "--count", "5"])
+    """
+
+    def parse_arguments(args=None):
+        """Parse commandline arguments"""
+        parser = ArgumentParser(
+            description=description,
+            argument_generation_mode=ArgumentGenerationMode.NESTED,
+            nested_mode=NestedMode.WITHOUT_ROOT,
+        )
+        parser.add_arguments(params_class, dest="parameters")
+        opts = parser.parse_args(args)
+        return opts.parameters
+
+    return parse_arguments
 
 
 def with_logging(log_filename=None, log_level="INFO"):
