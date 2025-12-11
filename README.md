@@ -1,7 +1,7 @@
 <!--[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10519719.svg)](https://doi.org/10.5281/zenodo.10519719)-->
 
 > [!NOTE]
-> This is a fork of [ando-lab/mdx2](https://github.com/ando-lab/mdx2), intended for active development by [The Diffuse Project](https://diffuse.science) 
+> This is a fork of [ando-lab/mdx2](https://github.com/ando-lab/mdx2), intended for active development by [The Diffuse Project](https://diffuse.science)
 
 # *mdx2*: macromolecular diffuse scattering data reduction in python
 
@@ -37,8 +37,8 @@ Publications describing [ando-lab/mdx2](https://github.com/ando-lab/mdx2):
 - Rudimentary Bragg peak integration, in development
 - Support for non-reference space group settings
 - Bug fixes, including:
-    - Symmetry operators now rotate in the correct direction
-    - Gracefully skip missing or masked data chunks
+  - Symmetry operators now rotate in the correct direction
+  - Gracefully skip missing or masked data chunks
 
 ## Installation
 
@@ -67,5 +67,7 @@ git clone https://github.com/diff-use/mdx2.git
 cd mdx2
 micromamba create -f env.yaml -n mdx2-dev
 micromamba activate mdx2-dev
-pip install -e .
+pip install -e ".[dev]"
 ```
+
+The last line installs mdx2 in editable mode, with optional development tools including pytest and ruff
