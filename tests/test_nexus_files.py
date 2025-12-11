@@ -1,8 +1,9 @@
 import nexusformat.nexus as nxs
 import numpy as np
+import pytest
 
 from mdx2.data import ImageSeries
-from mdx2.io import nxsave
+from mdx2.io import loadobj, nxsave, saveobj
 
 
 def test_writing_data_after_nxsave(tmp_path):
@@ -44,3 +45,35 @@ def test_ImageSeries_virtual_dataset_creation(tmp_path):
     source_series = ImageSeries.load(nxobj.data._vfiles[1], mode="r+")
     source_series.data[0, 0, 0] = 666
     assert image_series.data[8, 0, 0] == 666
+
+
+def test_loadobj_security_checks(tmp_path):
+    """Test that loadobj rejects untrusted modules and validates interface."""
+    # Create a simple mdx2 object and save it properly
+    phi = np.arange(10)
+    iy = np.arange(5)
+    ix = np.arange(5)
+    data = nxs.NXfield(shape=(10, 5, 5), dtype=np.int32)
+    exposure_times = 0.1 * np.ones_like(phi)
+    image_series = ImageSeries(phi, iy, ix, data, exposure_times)
+
+    filename = tmp_path / "test_security.nxs"
+    saveobj(image_series, filename, name="test_obj")
+
+    # Test 1: Attempt to load with a malicious module name
+    nxroot = nxs.nxload(filename, "r+")
+    nxroot.entry.test_obj.attrs["mdx2_module"] = "os"  # Malicious module
+    nxroot.entry.test_obj.attrs["mdx2_class"] = "system"
+    nxroot.save(filename, mode="w")
+
+    with pytest.raises(ValueError, match="Untrusted module 'os': only mdx2.* modules are allowed"):
+        loadobj(filename, "test_obj")
+
+    # Test 2: Attempt to load with a class that doesn't have from_nexus
+    nxroot = nxs.nxload(filename, "r+")
+    nxroot.entry.test_obj.attrs["mdx2_module"] = "mdx2.data"
+    nxroot.entry.test_obj.attrs["mdx2_class"] = "NonExistentClass"
+    nxroot.save(filename, mode="w")
+
+    with pytest.raises(AttributeError):  # getattr will raise AttributeError
+        loadobj(filename, "test_obj")

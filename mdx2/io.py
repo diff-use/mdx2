@@ -44,16 +44,44 @@ def nxsave(nxsobj, filename, mode="w", **kwargs):
 
 
 def loadobj(filename, objectname):
-    # simple wrapper to load mdx2 objects from nxs files
-    # handles import using the mdx2_module and mdx2_class attributes
-    # does a from_nexus() call to instantiate the class
-    # Note: version checking is handled by nxload()
+    """Load mdx2 objects from nexus files with security validation.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the nexus file
+    objectname : str
+        Name of the object within the nexus file entry
+
+    Returns
+    -------
+    object
+        The deserialized mdx2 object
+
+    Raises
+    ------
+    ValueError
+        If the module is not from the mdx2 package
+    TypeError
+        If the class does not have a callable from_nexus method
+    """
     nxroot = nxload(filename, "r")
     nxs = nxroot["/entry/" + objectname]
     mod = nxs.attrs["mdx2_module"]
     cls = nxs.attrs["mdx2_class"]
+
+    # Security: Only allow mdx2 modules to prevent arbitrary code execution
+    if not mod.startswith("mdx2."):
+        raise ValueError(f"Untrusted module '{mod}': only mdx2.* modules are allowed")
+
+    # Import and get the class
     _tmp = importlib.__import__(mod, fromlist=[cls])
     Class = getattr(_tmp, cls)
+
+    # Validate the class has the expected interface
+    if not hasattr(Class, "from_nexus") or not callable(getattr(Class, "from_nexus")):
+        raise TypeError(f"{mod}.{cls} does not have a callable from_nexus method")
+
     return Class.from_nexus(nxs)
 
 
