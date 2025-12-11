@@ -161,6 +161,8 @@ def run_reintegrate(params):
         absorption_model = None
         offset_model = None
         detector_model = None
+    # NXfield objects can be pickled safely (they serialize metadata and reopen the file in each worker)
+    # so this works correctly with nproc > 1 despite being passed to joblib.Parallel
     mask = nxload(params.mask).entry.mask.signal if params.mask else None
 
     def intchunk(sl):
