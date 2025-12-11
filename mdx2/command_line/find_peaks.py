@@ -65,7 +65,13 @@ def run_find_peaks(params):
         peaklist = parallel(delayed(peaksearch)(sl) for sl in slices)
     logger.info("Peak search completed")
 
-    P = Peaks.stack([p for p in peaklist if p is not None])
+    peaks_nonempty = [p for p in peaklist if p is not None]
+    if not peaks_nonempty:
+        raise ValueError(
+            f"No peaks found above threshold {count_threshold}. "
+            f"Try lowering the threshold or check your data."
+        )
+    P = Peaks.stack(peaks_nonempty)
     logger.info("Found {} peak pixels", P.size)
 
     logger.info("Indexing peaks...")
