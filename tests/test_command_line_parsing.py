@@ -6,6 +6,7 @@ from mdx2.command_line.find_peaks import parse_arguments as find_peaks_parse_arg
 from mdx2.command_line.import_data import parse_arguments as import_data_parse_arguments
 from mdx2.command_line.import_geometry import parse_arguments as import_geometry_parse_arguments
 from mdx2.command_line.integrate import parse_arguments as integrate_parse_arguments
+from mdx2.command_line.map import parse_arguments as map_parse_arguments
 from mdx2.command_line.mask_peaks import parse_arguments as mask_peaks_parse_arguments
 from mdx2.command_line.merge import parse_arguments as merge_parse_arguments
 from mdx2.command_line.reintegrate import parse_arguments as reintegrate_parse_arguments
@@ -183,6 +184,18 @@ def test_import_geometry_parse_arguments(args, expected, raises):
             None,
             SystemExit,
         ),
+        # Zero sigma_cutoff
+        (
+            ["geometry.nxs", "data.nxs", "--count_threshold", "1000", "--sigma_cutoff", "0"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for sigma_cutoff <= 0
+        ),
+        # Negative sigma_cutoff
+        (
+            ["geometry.nxs", "data.nxs", "--count_threshold", "1000", "--sigma_cutoff", "-1.5"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for sigma_cutoff <= 0
+        ),
     ],
 )
 def test_find_peaks_parse_arguments(args, expected, raises):
@@ -260,6 +273,18 @@ def test_find_peaks_parse_arguments(args, expected, raises):
             None,
             SystemExit,
         ),
+        # Zero sigma_cutoff
+        (
+            ["geometry.nxs", "data.nxs", "peaks.nxs", "--sigma_cutoff", "0"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for sigma_cutoff <= 0
+        ),
+        # Negative sigma_cutoff
+        (
+            ["geometry.nxs", "data.nxs", "peaks.nxs", "--sigma_cutoff", "-2.0"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for sigma_cutoff <= 0
+        ),
     ],
 )
 def test_mask_peaks_parse_arguments(args, expected, raises):
@@ -328,6 +353,18 @@ def test_mask_peaks_parse_arguments(args, expected, raises):
             ["data.nxs", "2", "0", "30", "--outfile", "binned_data.nxs", "--nproc", "4"],
             None,
             ValueError,  # __post_init__ raises ValueError for zero bins
+        ),
+        # Invalid valid_range: min >= max
+        (
+            ["data.nxs", "2", "50", "30", "--valid_range", "1000", "0"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for invalid valid_range
+        ),
+        # Invalid valid_range: min == max
+        (
+            ["data.nxs", "2", "50", "30", "--valid_range", "100", "100"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for invalid valid_range
         ),
     ],
 )
@@ -421,6 +458,18 @@ def test_bin_image_series_parse_arguments(args, expected, raises):
             ],
             None,
             ValueError,  # __post_init__ raises ValueError for validation errors
+        ),
+        # Zero outlier
+        (
+            ["hkl.nxs", "--scale", "scale.nxs", "--outlier", "0"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for outlier <= 0
+        ),
+        # Negative outlier
+        (
+            ["hkl.nxs", "--scale", "scale.nxs", "--outlier", "-2.5"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for outlier <= 0
         ),
     ],
 )
@@ -520,6 +569,30 @@ def test_merge_parse_arguments(args, expected, raises):
                 "nproc": 4,
             },
             None,
+        ),
+        # Zero subdivide element
+        (
+            ["geom.nxs", "data.nxs", "--subdivide", "0", "2", "2", "--max_spread", "1.5"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for subdivide <= 0
+        ),
+        # Negative subdivide element
+        (
+            ["geom.nxs", "data.nxs", "--subdivide", "2", "-1", "2", "--max_spread", "1.5"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for subdivide <= 0
+        ),
+        # Zero max_spread
+        (
+            ["geom.nxs", "data.nxs", "--subdivide", "2", "2", "2", "--max_spread", "0"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for max_spread <= 0
+        ),
+        # Negative max_spread
+        (
+            ["geom.nxs", "data.nxs", "--subdivide", "2", "2", "2", "--max_spread", "-1.5"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for max_spread <= 0
         ),
     ],
 )
@@ -910,6 +983,18 @@ def test_correct_parse_arguments(args, expected, raises):
             None,
             SystemExit,
         ),
+        # Zero subdivide element
+        (
+            ["geom.nxs", "data.nxs", "--subdivide", "0", "2", "2"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for subdivide <= 0
+        ),
+        # Negative subdivide element
+        (
+            ["geom.nxs", "data.nxs", "--subdivide", "2", "-1", "2"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for subdivide <= 0
+        ),
     ],
 )
 def test_reintegrate_parse_arguments(args, expected, raises):
@@ -928,3 +1013,66 @@ def test_reintegrate_parse_arguments(args, expected, raises):
         assert params.output == expected["output"]
         assert params.outfile == expected["outfile"]
         assert params.nproc == expected["nproc"]
+
+
+@pytest.mark.parametrize(
+    "args,expected,raises",
+    [
+        # Valid case
+        (
+            [
+                "geometry.nxs",
+                "hkl_table.nxs",
+                "--limits",
+                "0",
+                "10",
+                "0",
+                "10",
+                "0",
+                "10",
+                "--outfile",
+                "map.nxs",
+            ],
+            {
+                "geom": "geometry.nxs",
+                "hkl": "hkl_table.nxs",
+                "limits": (0.0, 10.0, 0.0, 10.0, 0.0, 10.0),
+                "symmetry": True,
+                "signal": "intensity",
+                "outfile": "map.nxs",
+            },
+            None,
+        ),
+        # Invalid limits: hmin >= hmax
+        (
+            ["geometry.nxs", "hkl_table.nxs", "--limits", "10", "5", "0", "10", "0", "10"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for hmin >= hmax
+        ),
+        # Invalid limits: kmin >= kmax
+        (
+            ["geometry.nxs", "hkl_table.nxs", "--limits", "0", "10", "10", "10", "0", "10"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for kmin >= kmax
+        ),
+        # Invalid limits: lmin >= lmax
+        (
+            ["geometry.nxs", "hkl_table.nxs", "--limits", "0", "10", "0", "10", "15", "10"],
+            None,
+            ValueError,  # __post_init__ raises ValueError for lmin >= lmax
+        ),
+    ],
+)
+def test_map_parse_arguments(args, expected, raises):
+    """Test the map command line argument parsing."""
+    if raises:
+        with pytest.raises(raises):
+            map_parse_arguments(args=args)
+    else:
+        params = map_parse_arguments(args=args)
+        assert params.geom == expected["geom"]
+        assert params.hkl == expected["hkl"]
+        assert tuple(params.limits) == expected["limits"]
+        assert params.symmetry == expected["symmetry"]
+        assert params.signal == expected["signal"]
+        assert params.outfile == expected["outfile"]

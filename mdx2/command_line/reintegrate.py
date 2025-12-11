@@ -41,6 +41,12 @@ class Parameters:
     output: Literal["counts", "intensity"] = "counts"  # counts or intensity
     outfile: str = "reintegrated.nxs"  # name of the output data
 
+    def __post_init__(self):
+        """Validate subdivide parameter"""
+        for i, div in enumerate(self.subdivide):
+            if div <= 0:
+                raise ValueError(f"subdivide[{i}] must be > 0, got {div}")
+
 
 parse_arguments = make_argument_parser(Parameters, __doc__)
 

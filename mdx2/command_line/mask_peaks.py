@@ -26,6 +26,11 @@ class Parameters:
     nproc: int = 1  # number of parallel processes
     bragg: bool = False  # create a Bragg peak mask instead
 
+    def __post_init__(self):
+        """Validate sigma_cutoff parameter"""
+        if self.sigma_cutoff <= 0:
+            raise ValueError(f"sigma_cutoff must be > 0, got {self.sigma_cutoff}")
+
 
 parse_arguments = make_argument_parser(Parameters, __doc__)
 

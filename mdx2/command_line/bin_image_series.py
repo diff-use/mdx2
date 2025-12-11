@@ -28,10 +28,12 @@ class Parameters:
     nproc: int = 1  # number of parallel processes
 
     def __post_init__(self):
-        """Validate bins parameter"""
+        """Validate bins and valid_range parameters"""
         for i, bin_size in enumerate(self.bins):
             if bin_size <= 0:
                 raise ValueError(f"bins[{i}] must be positive, got {bin_size}")
+        if self.valid_range is not None and self.valid_range[0] >= self.valid_range[1]:
+            raise ValueError(f"valid_range[0] must be < valid_range[1], got {self.valid_range}")
 
 
 parse_arguments = make_argument_parser(Parameters, __doc__)

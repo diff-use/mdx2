@@ -31,6 +31,14 @@ class Parameters:
     nproc: int = 1  # number of parallel processes
     outfile: str = "integrated.nxs"  # name of the output NeXus file
 
+    def __post_init__(self):
+        """Validate subdivide and max_spread parameters"""
+        for i, div in enumerate(self.subdivide):
+            if div <= 0:
+                raise ValueError(f"subdivide[{i}] must be > 0, got {div}")
+        if self.max_spread <= 0:
+            raise ValueError(f"max_spread must be > 0, got {self.max_spread}")
+
 
 parse_arguments = make_argument_parser(Parameters, __doc__)
 

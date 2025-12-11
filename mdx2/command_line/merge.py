@@ -35,9 +35,11 @@ class Parameters:
     detector: bool = field(default=True, negative_prefix="--no-")  # apply detector model if present
 
     def __post_init__(self):
-        """Validate inter-parameter dependencies"""
+        """Validate inter-parameter dependencies and outlier parameter"""
         if self.split == "Friedel" and self.geometry is None:
             raise ValueError("--geometry argument is required for symmetry-based splitting")
+        if self.outlier is not None and self.outlier <= 0:
+            raise ValueError(f"outlier must be > 0, got {self.outlier}")
 
 
 # note: negative_prefix is used to allow --no-scaling, --no-offset, etc. for consistency with old argparse api
