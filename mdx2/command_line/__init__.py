@@ -57,7 +57,7 @@ def with_logging(log_filename=None, log_level="INFO"):
             file_format = "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}"
 
             # Stderr format: streamlined with fixed-width time and level, WITH colors
-            stderr_format = "<green>{time:HH:mm:ss}</green> <level>{level: <7}</level> | <level>{message}</level>"
+            stderr_format = "<green>{time:HH:mm:ss}</green> <level>{level: <7}</level> | {message}"
 
             # Add handlers with different formats
             logger.add(logfile, level=log_level, format=file_format, colorize=False)
