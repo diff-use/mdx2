@@ -28,7 +28,7 @@ class Parameters:
     mask: Optional[str] = None  # NeXus data file containing mask
     subdivide: Tuple[int, int, int] = (1, 1, 1)  # subdivisions of the Miller index grid
     max_spread: float = 1.0  # maximum angular spread (degrees) for binning partial observations
-    nproc: int = 1  # number of parallel processes
+    nproc: int = 1  # number of parallel processes (or 1 for sequential, -1 for all CPUs, -N for all but N+1)
     outfile: str = "integrated.nxs"  # name of the output NeXus file
 
     def __post_init__(self):

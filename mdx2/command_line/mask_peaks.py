@@ -23,7 +23,7 @@ class Parameters:
     peaks: str = field(positional=True)  # NeXus data file containing peak_model and peaks
     sigma_cutoff: float = 3.0  # contour level for drawing the peak mask
     outfile: str = "mask.nxs"  # name of the output NeXus file
-    nproc: int = 1  # number of parallel processes
+    nproc: int = 1  # number of parallel processes (or 1 for sequential, -1 for all CPUs, -N for all but N+1)
     bragg: bool = False  # create a Bragg peak mask instead
 
     def __post_init__(self):

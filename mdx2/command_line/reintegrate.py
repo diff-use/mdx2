@@ -37,7 +37,7 @@ class Parameters:
     subdivide: Tuple[int, int, int] = (1, 1, 1)  # subdivisions of the Miller index grid
     scale: Optional[str] = None  # NeXus file with scaling model
     background: Optional[str] = None  # NeXus file with background binned_image_series
-    nproc: int = 1  # number of parallel processes
+    nproc: int = 1  # number of parallel processes (or 1 for sequential, -1 for all CPUs, -N for all but N+1)
     output: Literal["counts", "intensity"] = "counts"  # counts or intensity
     outfile: str = "reintegrated.nxs"  # name of the output data
 
