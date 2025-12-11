@@ -1,9 +1,18 @@
+import sys
+import types
+
 import nexusformat.nexus as nxs
 import numpy as np
 import pytest
 
 from mdx2.data import ImageSeries
 from mdx2.io import loadobj, nxsave, saveobj
+
+
+# Create a test module with a class that lacks from_nexus method for security testing
+_test_module = types.ModuleType("mdx2.test_no_from_nexus")
+_test_module.ClassWithoutFromNexus = type("ClassWithoutFromNexus", (), {})
+sys.modules["mdx2.test_no_from_nexus"] = _test_module
 
 
 def test_writing_data_after_nxsave(tmp_path):
@@ -66,14 +75,23 @@ def test_loadobj_security_checks(tmp_path):
     nxroot.entry.test_obj.attrs["mdx2_class"] = "system"
     nxroot.save(filename, mode="w")
 
-    with pytest.raises(ValueError, match="Untrusted module 'os': only mdx2.* modules are allowed"):
+    with pytest.raises(ValueError, match=r"Untrusted module 'os': only mdx2\.\* modules are allowed"):
         loadobj(filename, "test_obj")
 
-    # Test 2: Attempt to load with a class that doesn't have from_nexus
+    # Test 2: Attempt to load with a non-existent class
     nxroot = nxs.nxload(filename, "r+")
     nxroot.entry.test_obj.attrs["mdx2_module"] = "mdx2.data"
     nxroot.entry.test_obj.attrs["mdx2_class"] = "NonExistentClass"
     nxroot.save(filename, mode="w")
 
     with pytest.raises(AttributeError):  # getattr will raise AttributeError
+        loadobj(filename, "test_obj")
+
+    # Test 3: Attempt to load with a class that exists but lacks from_nexus method
+    nxroot = nxs.nxload(filename, "r+")
+    nxroot.entry.test_obj.attrs["mdx2_module"] = "mdx2.test_no_from_nexus"
+    nxroot.entry.test_obj.attrs["mdx2_class"] = "ClassWithoutFromNexus"
+    nxroot.save(filename, mode="w")
+
+    with pytest.raises(TypeError, match=r"does not have a callable from_nexus method"):
         loadobj(filename, "test_obj")
