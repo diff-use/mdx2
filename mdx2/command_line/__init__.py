@@ -86,13 +86,12 @@ def with_logging(log_filename=None, log_level="INFO"):
             # Remove default handler
             logger.remove()
 
+            module_name = func.__module__.split(".")[-1]
             # Determine log filename and module name
             if log_filename is None:
-                module_name = func.__module__.split(".")[-1]
                 logfile = f"mdx2.{module_name}.log"
             else:
                 logfile = log_filename
-                module_name = func.__module__.split(".")[-1]
 
             # File format: detailed with full timestamp, NO color tags for plain text
             file_format = "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}"
