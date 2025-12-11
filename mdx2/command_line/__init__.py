@@ -6,7 +6,7 @@ from datetime import datetime
 from functools import wraps
 
 from loguru import logger
-from simple_parsing import ArgumentParser, ArgumentGenerationMode, NestedMode
+from simple_parsing import ArgumentGenerationMode, ArgumentParser, NestedMode
 
 
 def log_parallel_backend(parallel):
