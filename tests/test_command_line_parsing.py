@@ -728,6 +728,27 @@ def test_integrate_parse_arguments(args, expected, raises):
             None,
             ValueError,
         ),
+        # Invalid case: duplicate input files
+        (
+            [
+                "integrated.nxs",
+                "integrated.nxs",
+            ],
+            None,
+            ValueError,
+        ),
+        # Invalid case: duplicate input files with explicit outfiles
+        (
+            [
+                "data.nxs",
+                "data.nxs",
+                "--outfile",
+                "scales_1.nxs",
+                "scales_2.nxs",
+            ],
+            None,
+            ValueError,
+        ),
     ],
 )
 def test_scale_parse_arguments(args, expected, raises):

@@ -109,7 +109,17 @@ class Parameters:
             self.absorption.enable = True
             self.offset.enable = True
 
+        # Check for duplicate input files
+        # Note: Same filename in different directories is valid (e.g., /path1/data.nxs, /path2/data.nxs)
+        # But truly duplicate paths are not allowed (e.g., data.nxs, data.nxs)
+        if len(self.hkl) != len(set(self.hkl)):
+            raise ValueError("Duplicate input files are not allowed")
+
         # Auto-generate output file names if not provided
+        # This handles various patterns:
+        # - Different directories → scales.nxs in each directory
+        # - Same directory with underscore pattern → scales_<postfix>.nxs
+        # - Other cases return None and trigger error below
         if self.outfile is None:
             self.outfile = generate_default_outfiles(self.hkl)
             if self.outfile is None:
