@@ -108,7 +108,15 @@ class Experiment:
 
     @property
     def exposure_times(self):
-        return np.array(tuple(self._scan.get_exposure_times()))
+        dt = np.array(tuple(self._scan.get_exposure_times()))
+        # NOTE: different versions of dxtbx encode exposure times differently.
+        # TODO: implement checks for dxtbx version mismatchs and resolve before errors occur.
+
+        # Fix a bug in dxtbx. When cbf files are imported without reading all the headers,
+        # only the first element in the list of exposure times is set, and the rest are zero.
+        if np.count_nonzero(dt) == 1 and dt[0] > 0:
+            dt[:] = dt[0]
+        return dt
 
     @property
     def space_group_number(self):
