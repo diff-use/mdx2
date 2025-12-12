@@ -90,11 +90,11 @@ class Parameters:
     """Options for refining a scaling model to unmerged corrected intensities"""
 
     hkl: List[str] = field(positional=True, nargs="+")  # NeXus file(s) containing hkl_table
-    prescale: PrescaleParameters
-    scaling: ScalingModelParameters
-    absorption: AbsorptionModelParameters
-    detector: DetectorModelParameters
-    offset: OffsetModelParameters
+    prescale: PrescaleParameters = field(default_factory=PrescaleParameters)
+    scaling: ScalingModelParameters = field(default_factory=ScalingModelParameters)
+    absorption: AbsorptionModelParameters = field(default_factory=AbsorptionModelParameters)
+    detector: DetectorModelParameters = field(default_factory=DetectorModelParameters)
+    offset: OffsetModelParameters = field(default_factory=OffsetModelParameters)
     outfile: Optional[List[str]] = field(default=None, nargs="*")
     """name of the output NeXus file(s). If omitted, will attempt a sensible name such as scales.nxs"""
     mca2020: bool = False
