@@ -90,7 +90,9 @@ def with_logging(log_filename=None, log_level="INFO"):
             logger.remove()
 
             # Check if args contains --help or -h, and if so just run the func and return result
-            if args is not None and ("--help" in args or "-h" in args):
+            # NOTE: does not handle the case where func is called with incorrect usage, and parse_arguments raises an error.
+            cli_args = args if args is not None else sys.argv[1:]
+            if "--help" in cli_args or "-h" in cli_args:
                 return func(args)
 
             module_name = func.__module__.split(".")[-1]
