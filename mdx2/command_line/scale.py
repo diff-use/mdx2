@@ -131,6 +131,10 @@ class Parameters:
                 f"Number of output files ({len(self.outfile)}) must match number of input files ({len(self.hkl)})"
             )
 
+        # Ensure at least one model is enabled
+        if not (self.scaling.enable or self.absorption.enable or self.detector.enable or self.offset.enable):
+            raise ValueError("At least one model must be enabled: scaling, absorption, detector, or offset.")
+
 
 def generate_default_outfiles(infiles):
     """Generate default output file names based on input file names.
