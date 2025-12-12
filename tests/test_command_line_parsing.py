@@ -96,7 +96,7 @@ def test_import_data_parse_arguments(args, expected, raises):
     ],
 )
 def test_import_geometry_parse_arguments(args, expected, raises):
-    """Test the import data command line argument parsing."""
+    """Test the import geometry command line argument parsing."""
     if raises:
         with pytest.raises(raises):
             import_geometry_parse_arguments(args=args)
