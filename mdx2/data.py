@@ -401,15 +401,14 @@ class HKLGrid:
     def accumulate(self, *coords, resize=False, **values):
         """Accumulate values on one or more data grids
 
-        Values can be an ndarray if ncols==1, otherwise values is a dictionary mapping to the keys in data.
+        Values must be passed as keyword arguments mapping to the keys in data, e.g.:
+            accumulate(h, k, l, intensity=arr)
+        All values must be arrays of the same shape as the coordinate arrays.
 
         There are two modes:
         - resize=True, arrays will be resized if necessary to accomodate coordinates outside of current bounds
         - resize=False, values will be silently excluded if they fall outside the current array bounds
         """
-        if not isinstance(values, dict) and len(self._data) == 1:
-            k = list(self._data.keys())[0]
-            values = {k: values}
         for k in values.keys():
             if k not in self._data:
                 raise KeyError(f"key {k} not found in data")
