@@ -32,9 +32,6 @@ class Parameters:
             raise ValueError(f"sigma_cutoff must be > 0, got {self.sigma_cutoff}")
 
 
-parse_arguments = make_argument_parser(Parameters, __doc__)
-
-
 def run_mask_peaks(params):
     """Run the mask peaks script"""
     geom = params.geom
