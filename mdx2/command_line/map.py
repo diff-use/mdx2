@@ -30,12 +30,12 @@ class Parameters:
     def __post_init__(self):
         """Validate limits parameter"""
         hmin, hmax, kmin, kmax, lmin, lmax = self.limits
-        if hmin >= hmax:
-            raise ValueError(f"limits: hmin must be < hmax, got hmin={hmin}, hmax={hmax}")
-        if kmin >= kmax:
-            raise ValueError(f"limits: kmin must be < kmax, got kmin={kmin}, kmax={kmax}")
-        if lmin >= lmax:
-            raise ValueError(f"limits: lmin must be < lmax, got lmin={lmin}, lmax={lmax}")
+        if hmin > hmax:
+            raise ValueError(f"limits: hmin must be <= hmax, got hmin={hmin}, hmax={hmax}")
+        if kmin > kmax:
+            raise ValueError(f"limits: kmin must be <= kmax, got kmin={kmin}, kmax={kmax}")
+        if lmin > lmax:
+            raise ValueError(f"limits: lmin must be <= lmax, got lmin={lmin}, lmax={lmax}")
 
 
 # NOTE: should perhaps change so that limits is a required argument
