@@ -1064,23 +1064,36 @@ def test_reintegrate_parse_arguments(args, expected, raises):
             },
             None,
         ),
-        # Invalid limits: hmin >= hmax
+        # Valid limits: lmin == lmax
+        (
+            ["geometry.nxs", "hkl_table.nxs", "--limits", "0", "10", "0", "10", "5", "5"],
+            {
+                "geom": "geometry.nxs",
+                "hkl": "hkl_table.nxs",
+                "limits": (0.0, 10.0, 0.0, 10.0, 5.0, 5.0),
+                "symmetry": True,
+                "signal": "intensity",
+                "outfile": "map.nxs",
+            },
+            None,
+        ),
+        # Invalid limits: hmin > hmax
         (
             ["geometry.nxs", "hkl_table.nxs", "--limits", "10", "5", "0", "10", "0", "10"],
             None,
-            ValueError,  # __post_init__ raises ValueError for hmin >= hmax
+            ValueError,  # __post_init__ raises ValueError for hmin > hmax
         ),
-        # Invalid limits: kmin >= kmax
+        # Invalid limits: kmin > kmax
         (
-            ["geometry.nxs", "hkl_table.nxs", "--limits", "0", "10", "10", "10", "0", "10"],
+            ["geometry.nxs", "hkl_table.nxs", "--limits", "0", "10", "11", "10", "0", "10"],
             None,
-            ValueError,  # __post_init__ raises ValueError for kmin >= kmax
+            ValueError,  # __post_init__ raises ValueError for kmin > kmax
         ),
-        # Invalid limits: lmin >= lmax
+        # Invalid limits: lmin > lmax
         (
             ["geometry.nxs", "hkl_table.nxs", "--limits", "0", "10", "0", "10", "15", "10"],
             None,
-            ValueError,  # __post_init__ raises ValueError for lmin >= lmax
+            ValueError,  # __post_init__ raises ValueError for lmin > lmax
         ),
     ],
 )
