@@ -4,6 +4,8 @@ import sys
 import time
 from datetime import datetime
 from functools import wraps
+from joblib import effective_n_jobs
+
 
 from loguru import logger
 from simple_parsing import ArgumentGenerationMode, ArgumentParser, NestedMode
@@ -26,7 +28,8 @@ def log_parallel_backend(parallel):
             backend_name = parallel._backend.__class__.__name__
         else:
             backend_name = "Unknown"
-        logger.info("Using backend: {}, n_jobs: {}", backend_name, parallel.n_jobs)
+        n_jobs = effective_n_jobs(parallel.n_jobs)  # handle -1, -N cases
+        logger.info("Using backend: {}, n_jobs: {}", backend_name, n_jobs)
     except Exception as e:
         logger.warning("Could not determine joblib backend details: {}", e)
 
