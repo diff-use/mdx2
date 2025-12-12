@@ -140,11 +140,10 @@ def generate_default_outfiles(infiles):
     """Generate default output file names based on input file names.
 
     - If the input files are in different directories, returns a list of scales.nxs in each directory.
-    - If the input files are in the same directory, returns a single scales.nxs file with a unique postfix
-    based on the input file names.
-    - If the input files have a common pattern, returns a list of scales_<postfix>.nxs
-    where <postfix> is derived from the input file names.
-    - If the input files do not match any of these criteria, returns None.
+    - If the input files are in the same directory and all have an underscore in the root name,
+      and the postfixes (the part after the last underscore) are unique, returns a list of
+      scales_<postfix>.nxs in the same directory.
+    - Otherwise, returns None.
     """
     dirs = [os.path.dirname(fn) for fn in infiles]
     if len(set(dirs)) == len(dirs):  # dirs are unique
