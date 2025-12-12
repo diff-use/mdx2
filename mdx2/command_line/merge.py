@@ -40,6 +40,10 @@ class Parameters:
             raise ValueError("--geometry argument is required for symmetry-based splitting")
         if self.outlier is not None and self.outlier <= 0:
             raise ValueError(f"outlier must be > 0, got {self.outlier}")
+        if len(self.scale) != len(self.hkl):
+            raise ValueError(
+                f"Number of scale files ({len(self.scale)}) must match number of HKL inputs ({len(self.hkl)})"
+            )
 
 
 # note: negative_prefix is used to allow --no-scaling, --no-offset, etc. for consistency with old argparse api
