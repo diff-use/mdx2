@@ -9,7 +9,7 @@ from joblib import Parallel, delayed
 from loguru import logger
 from simple_parsing import field  # pip install simple-parsing
 
-from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging
+from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging, with_parsing
 from mdx2.geometry import GridData
 from mdx2.io import loadobj, saveobj
 
@@ -91,12 +91,11 @@ def run_mask_peaks(params):
     logger.info("Mask creation completed successfully")
 
 
-@with_logging()
-def run(args=None):
-    """Run the mask peaks script"""
-    params = parse_arguments(args=args)
-    logger.info(params)
-    run_mask_peaks(params)
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
+
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_mask_peaks))
 
 
 if __name__ == "__main__":

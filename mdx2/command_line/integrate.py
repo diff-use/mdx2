@@ -10,7 +10,7 @@ from joblib import Parallel, delayed
 from loguru import logger
 from simple_parsing import field
 
-from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging
+from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging, with_parsing
 from mdx2.data import HKLTable
 from mdx2.io import (
     loadobj,
@@ -38,9 +38,6 @@ class Parameters:
                 raise ValueError(f"subdivide[{i}] must be > 0, got {div}")
         if self.max_spread <= 0:
             raise ValueError(f"max_spread must be > 0, got {self.max_spread}")
-
-
-parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def run_integrate(params):
@@ -125,12 +122,11 @@ def run_integrate(params):
     logger.info("Integration completed successfully")
 
 
-@with_logging()
-def run(args=None):
-    """Run the integrate script"""
-    params = parse_arguments(args=args)
-    logger.info(params)
-    run_integrate(params)
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
+
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_integrate))
 
 
 if __name__ == "__main__":

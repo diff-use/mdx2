@@ -10,7 +10,7 @@ from joblib import Parallel, delayed
 from loguru import logger
 from simple_parsing import field
 
-from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging
+from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging, with_parsing
 from mdx2.geometry import GridData
 from mdx2.io import loadobj, nxload, saveobj
 from mdx2.utils import slice_sections
@@ -34,9 +34,6 @@ class Parameters:
                 raise ValueError(f"bins[{i}] must be positive, got {bin_size}")
         if self.valid_range is not None and self.valid_range[0] >= self.valid_range[1]:
             raise ValueError(f"valid_range[0] must be < valid_range[1], got {self.valid_range}")
-
-
-parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def run_bin_image_series(params):
@@ -108,12 +105,11 @@ def run_bin_image_series(params):
     logger.info("Binning completed successfully")
 
 
-@with_logging()
-def run(args=None):
-    """Run the binning script"""
-    params = parse_arguments(args=args)
-    logger.info(params)
-    run_bin_image_series(params)
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
+
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_bin_image_series))
 
 
 if __name__ == "__main__":

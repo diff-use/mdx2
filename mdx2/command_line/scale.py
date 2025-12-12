@@ -10,7 +10,7 @@ import numpy as np
 from loguru import logger
 from simple_parsing import field
 
-from mdx2.command_line import make_argument_parser, with_logging
+from mdx2.command_line import make_argument_parser, with_logging, with_parsing
 from mdx2.data import HKLTable
 from mdx2.io import loadobj, saveobj
 from mdx2.scaling import BatchModelRefiner, ScaledData
@@ -152,9 +152,6 @@ def generate_default_outfiles(infiles):
             if len(set(postfix)) == len(postfix):  # postfixes are unique
                 return [os.path.join(dirs[0], f"scales_{pf}.nxs") for pf in postfix]
     return None
-
-
-parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def mask_outliers(MR, outlier):
@@ -425,12 +422,11 @@ def run_scale(params):
     logger.info("Scaling completed successfully")
 
 
-@with_logging()
-def run(args=None):
-    """Run the scale script"""
-    params = parse_arguments(args=args)
-    logger.info(params)
-    run_scale(params)
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
+
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_scale))
 
 
 if __name__ == "__main__":

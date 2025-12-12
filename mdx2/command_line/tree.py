@@ -2,21 +2,26 @@
 View the NeXus file tree
 """
 
-import argparse
+from dataclasses import dataclass
 
+from simple_parsing import field
+
+from mdx2.command_line import make_argument_parser, with_parsing
 from mdx2.io import nxload
 
-parser = argparse.ArgumentParser(
-    description=__doc__,
-)
 
-parser.add_argument("filename", help="NeXus file name")
+@dataclass
+class Parameters:
+    filename: str = field(positional=True, help="NeXus file name")
 
 
-def run(args=None):
-    args = parser.parse_args(args)
-    nxs = nxload(args.filename, "r")
-    print(f"{args.filename}:", nxs.tree)
+parse_arguments = make_argument_parser(Parameters, __doc__)
+
+
+@with_parsing(parse_arguments)
+def run(params):
+    nxs = nxload(params.filename, "r")
+    print(f"{params.filename}:", nxs.tree)
 
 
 if __name__ == "__main__":

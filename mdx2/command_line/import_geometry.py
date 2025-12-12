@@ -9,7 +9,7 @@ from loguru import logger
 from simple_parsing import field
 
 import mdx2.geometry as geom
-from mdx2.command_line import make_argument_parser, with_logging
+from mdx2.command_line import make_argument_parser, with_logging, with_parsing
 from mdx2.io import saveobj
 
 
@@ -26,9 +26,6 @@ class Parameters:
         for i, spacing in enumerate(self.sample_spacing):
             if spacing <= 0:
                 raise ValueError(f"sample_spacing[{i}] must be positive, got {spacing}")
-
-
-parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def run_import_geometry(params):
@@ -73,13 +70,11 @@ def run_import_geometry(params):
     logger.info("Geometry saved successfully")
 
 
-@with_logging()
-def run(args=None):
-    """Run the import geometry script"""
-    params = parse_arguments(args=args)
-    logger.info(params)
-    run_import_geometry(params)
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
 
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_import_geometry))
 
 if __name__ == "__main__":
     run()

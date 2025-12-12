@@ -10,7 +10,7 @@ from joblib import Parallel, delayed
 from loguru import logger
 from simple_parsing import field
 
-from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging
+from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging, with_parsing
 from mdx2.data import HKLGrid, HKLTable
 from mdx2.io import (
     loadobj,
@@ -46,9 +46,6 @@ class Parameters:
         for i, div in enumerate(self.subdivide):
             if div <= 0:
                 raise ValueError(f"subdivide[{i}] must be > 0, got {div}")
-
-
-parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def calc_corrections(
@@ -246,13 +243,11 @@ def run_reintegrate(params):
     logger.info("Reintegration completed successfully")
 
 
-@with_logging()
-def run(args=None):
-    """Run the reintegrate script"""
-    params = parse_arguments(args=args)
-    logger.info(params)
-    run_reintegrate(params)
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
 
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_reintegrate))
 
 if __name__ == "__main__":
     run()

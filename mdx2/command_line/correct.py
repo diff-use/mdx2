@@ -9,7 +9,7 @@ import numpy as np
 from loguru import logger
 from simple_parsing import field  # pip install simple-parsing
 
-from mdx2.command_line import make_argument_parser, with_logging
+from mdx2.command_line import make_argument_parser, with_logging, with_parsing
 from mdx2.io import loadobj, saveobj
 
 
@@ -26,9 +26,6 @@ class Parameters:
     lorentz: bool = False  # apply Lorentz correction
     p1: bool = False  # map Miller indices to asymmetric unit for P1 (Friedel symmetry only)
     outfile: str = "corrected.nxs"  # name of the output NeXus file
-
-
-parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def run_correct(params):
@@ -135,12 +132,11 @@ def run_correct(params):
     logger.info("Corrections completed successfully")
 
 
-@with_logging()
-def run(args=None):
-    """Run the correct script"""
-    params = parse_arguments(args=args)
-    logger.info(params)
-    run_correct(params)
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
+
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_correct))
 
 
 if __name__ == "__main__":

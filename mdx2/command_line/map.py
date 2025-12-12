@@ -9,7 +9,7 @@ import numpy as np
 from loguru import logger
 from simple_parsing import field
 
-from mdx2.command_line import make_argument_parser, with_logging
+from mdx2.command_line import make_argument_parser, with_logging, with_parsing
 from mdx2.data import HKLTable
 from mdx2.geometry import GridData
 from mdx2.io import loadobj, saveobj
@@ -39,9 +39,6 @@ class Parameters:
 
 
 # NOTE: should perhaps change so that limits is a required argument
-
-
-parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def run_map(params):
@@ -92,13 +89,11 @@ def run_map(params):
     logger.info("Map creation completed successfully")
 
 
-@with_logging()
-def run(args=None):
-    """Run the map script"""
-    params = parse_arguments(args=args)
-    logger.info(params)
-    run_map(params)
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
 
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_map))
 
 if __name__ == "__main__":
     run()

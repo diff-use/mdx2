@@ -4,9 +4,8 @@ import sys
 import time
 from datetime import datetime
 from functools import wraps
+
 from joblib import effective_n_jobs
-
-
 from loguru import logger
 from simple_parsing import ArgumentGenerationMode, ArgumentParser, NestedMode
 
@@ -74,6 +73,27 @@ def make_argument_parser(params_class, description):
     return parse_arguments
 
 
+def with_parsing(parse_arguments):
+    """
+    Decorator to parse command-line arguments before calling the function.
+
+    Args:
+        parse_arguments: A function that takes (args=None) and returns a Parameters object.
+
+    The decorated function should accept a single argument: the parsed Parameters object.
+    """
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(args=None):
+            params = parse_arguments(args)
+            return func(params)
+
+        return wrapper
+
+    return decorator
+
+
 def with_logging(log_filename=None, log_level="INFO"):
     """
     Decorator to set up logging for command-line tools.
@@ -85,15 +105,9 @@ def with_logging(log_filename=None, log_level="INFO"):
 
     def decorator(func):
         @wraps(func)
-        def wrapper(args=None):
+        def wrapper(params):
             # Remove default handler
             logger.remove()
-
-            # Check if args contains --help or -h, and if so just run the func and return result
-            # NOTE: does not handle the case where func is called with incorrect usage, and parse_arguments raises an error.
-            cli_args = args if args is not None else sys.argv[1:]
-            if "--help" in cli_args or "-h" in cli_args:
-                return func(args)
 
             module_name = func.__module__.split(".")[-1]
             # Determine log filename and module name
@@ -116,9 +130,10 @@ def with_logging(log_filename=None, log_level="INFO"):
             start_time = time.time()
             start_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             logger.info(f"Starting mdx2.{module_name} at {start_datetime}")
+            logger.info(params)
 
             try:
-                result = func(args)
+                result = func(params)
                 elapsed = time.time() - start_time
                 logger.success(f"mdx2.{module_name} completed in {elapsed:.2f} seconds")
                 return result

@@ -10,7 +10,7 @@ from loguru import logger
 from nexusformat.nexus import nxload
 from simple_parsing import field  # pip install simple-parsing
 
-from mdx2.command_line import make_argument_parser, with_logging
+from mdx2.command_line import make_argument_parser, with_logging, with_parsing
 from mdx2.data import HKLTable
 from mdx2.io import loadobj, saveobj
 from mdx2.scaling import BatchModelRefiner, ScaledData
@@ -44,9 +44,6 @@ class Parameters:
 
 # note: negative_prefix is used to allow --no-scaling, --no-offset, etc. for consistency with old argparse api
 # future: could switch split to an Enum type, to simplify selection of choices by alternate APIs
-
-
-parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def wrs(index_map, w):
@@ -202,12 +199,11 @@ def run_merge(params):
     logger.info("Merge completed successfully")
 
 
-@with_logging()
-def run(args=None):
-    """Run the merge script"""
-    params = parse_arguments(args=args)
-    logger.info(params)
-    run_merge(params)
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
+
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_merge))
 
 
 if __name__ == "__main__":

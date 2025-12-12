@@ -9,7 +9,7 @@ from joblib import Parallel, delayed
 from loguru import logger
 from simple_parsing import field
 
-from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging
+from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging, with_parsing
 from mdx2.data import ImageSeries
 from mdx2.dxtbx_machinery import ImageSet
 from mdx2.io import nxload
@@ -26,9 +26,6 @@ class Parameters:
     outfile: str = "data.nxs"  # name of the output NeXus file
     nproc: int = 1  # number of parallel processes (or 1 for sequential, -1 for all CPUs, -N for all but N+1)
     datastore: str = "datastore"  # folder for storing source datasets
-
-
-parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def run_import_data(params):
@@ -85,12 +82,11 @@ def run_import_data(params):
     logger.info("Image data import completed successfully")
 
 
-@with_logging()
-def run(args=None):
-    """Run the import data script"""
-    params = parse_arguments(args=args)
-    logger.info(params)
-    run_import_data(params)
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
+
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_import_data))
 
 
 if __name__ == "__main__":

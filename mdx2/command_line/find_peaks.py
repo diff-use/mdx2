@@ -9,7 +9,7 @@ from joblib import Parallel, delayed
 from loguru import logger
 from simple_parsing import field  # pip install simple-parsing
 
-from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging
+from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging, with_parsing
 from mdx2.data import Peaks
 from mdx2.geometry import GaussianPeak
 from mdx2.io import loadobj, saveobj
@@ -30,9 +30,6 @@ class Parameters:
         """Validate sigma_cutoff parameter"""
         if self.sigma_cutoff <= 0:
             raise ValueError(f"sigma_cutoff must be > 0, got {self.sigma_cutoff}")
-
-
-parse_arguments = make_argument_parser(Parameters, __doc__)
 
 
 def run_find_peaks(params):
@@ -103,13 +100,11 @@ def run_find_peaks(params):
     logger.info("Peak finding completed successfully")
 
 
-@with_logging()
-def run(args=None):
-    """Run the find peaks script"""
-    params = parse_arguments(args=args)
-    logger.info(params)
-    run_find_peaks(params)
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
 
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_find_peaks))
 
 if __name__ == "__main__":
     run()
