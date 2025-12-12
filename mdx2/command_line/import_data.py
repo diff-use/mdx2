@@ -68,6 +68,12 @@ def run_import_data(params):
     files = image_series_reloaded.virtual_source_files
     vpath = image_series_reloaded.virtual_dataset_path
 
+    # These edge cases should not happen if virtual datasets are implemented correctly, but check anyway
+    if len(files) != len(slices):
+        raise RuntimeError(f"Virtual dataset mismatch: {len(slices)=} vs {len(files)=}")
+    if len(set(files)) != len(files):
+        raise RuntimeError("Virtual_source_files contains duplicates, cannot proceed with import.")
+
     # Properties will raise RuntimeError if internal API has changed
     # If data is not a virtual dataset, they return None
     if files is None or vpath is None:
