@@ -89,6 +89,10 @@ def with_logging(log_filename=None, log_level="INFO"):
             # Remove default handler
             logger.remove()
 
+            # Check if args contains --help or -h, and if so just run the func and return result
+            if args is not None and ("--help" in args or "-h" in args):
+                return func(args)
+
             module_name = func.__module__.split(".")[-1]
             # Determine log filename and module name
             if log_filename is None:
