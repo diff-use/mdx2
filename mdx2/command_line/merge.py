@@ -2,45 +2,52 @@
 Merge corrected intensities using a scaling model
 """
 
-import argparse
+from dataclasses import dataclass
+from typing import List, Optional
 
 import numpy as np
+from loguru import logger
 from nexusformat.nexus import nxload
+from simple_parsing import field  # pip install simple-parsing
 
+from mdx2.command_line import make_argument_parser, with_logging, with_parsing
 from mdx2.data import HKLTable
+from mdx2.io import loadobj, saveobj
 from mdx2.scaling import BatchModelRefiner, ScaledData
-from mdx2.utils import loadobj, saveobj
 
 
-def parse_arguments():
-    """Parse commandline arguments"""
+@dataclass
+class Parameters:
+    """Options for merging scaled intensities"""
 
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    hkl: List[str] = field(positional=True, nargs="+")  # NeXus file(s) containing hkl_table
+    scale: List[str] = field(nargs="+")  # NeXus file(s) with scaling models
+    outlier: Optional[float] = None  # optional standard error cutoff for outlier rejection
+    split: Optional[str] = field(default=None, choices=["randomHalf", "weightedRandomHalf", "Friedel"])
+    """also merge data into separate columns based on splitting criteria"""
+    geometry: Optional[str] = (
+        None  # NeXus file containing the Laue group symmetry operators, required for --split Friedel
     )
+    outfile: str = "merged.nxs"  # name of the output NeXus file
+    scaling: bool = field(default=True, negative_prefix="--no-")  # apply scaling model if present
+    offset: bool = field(default=True, negative_prefix="--no-")  # apply offset model if present
+    absorption: bool = field(default=True, negative_prefix="--no-")  # apply absorption model if present
+    detector: bool = field(default=True, negative_prefix="--no-")  # apply detector model if present
 
-    # Required arguments
-    parser.add_argument("hkl", nargs="+", help="NeXus file(s) with hkl_table")
-    parser.add_argument("--scale", nargs="+", help="NeXus file(s) with scaling models")
-    parser.add_argument("--outfile", default="merged.nxs", help="name of the output NeXus file")
-    parser.add_argument(
-        "--outlier", type=float, metavar="NSIGMA", help="optional standard error cutoff for outlier rejection"
-    )
-    parser.add_argument(
-        "--split",
-        choices=["randomHalf", "weightedRandomHalf", "Friedel"],  # TODO: batch, Laue, Friedel, etc
-        help="also merge data into separate columns based on splitting criteria",
-    )
-    parser.add_argument(
-        "--geometry", help="NeXus file containing the Laue group symmetry operators, required if --split is 'Friedel'"
-    )
-    parser.add_argument("--no-scaling", action="store_true", help="do not apply scaling model")
-    parser.add_argument("--no-offset", action="store_true", help="do not apply offset model")
-    parser.add_argument("--no-absorption", action="store_true", help="do not apply absorption model")
-    parser.add_argument("--no-detector", action="store_true", help="do not apply detector model")
+    def __post_init__(self):
+        """Validate inter-parameter dependencies and outlier parameter"""
+        if self.split == "Friedel" and self.geometry is None:
+            raise ValueError("--geometry argument is required for symmetry-based splitting")
+        if self.outlier is not None and self.outlier <= 0:
+            raise ValueError(f"outlier must be > 0, got {self.outlier}")
+        if len(self.scale) != len(self.hkl):
+            raise ValueError(
+                f"Number of scale files ({len(self.scale)}) must match number of HKL inputs ({len(self.hkl)})"
+            )
 
-    return parser
+
+# note: negative_prefix is used to allow --no-scaling, --no-offset, etc. for consistency with old argparse api
+# future: could switch split to an Enum type, to simplify selection of choices by alternate APIs
 
 
 def wrs(index_map, w):
@@ -64,21 +71,32 @@ def wrs(index_map, w):
     return isgrp1
 
 
-def run(args=None):
-    parser = parse_arguments()
-    args = parser.parse_args(args)
+def run_merge(params):
+    """Run the merge script"""
+    hkl = params.hkl
+    scale = params.scale
+    outfile = params.outfile
+    outlier = params.outlier
+    split = params.split
+    apply_scaling = params.scaling
+    apply_offset = params.offset
+    apply_absorption = params.absorption
+    apply_detector = params.detector
+    geometry = params.geometry
 
     # load data into a giant table
+    logger.info("Loading {} HKL table(s)...", len(hkl))
     tabs = []
 
-    for n, fn in enumerate(args.hkl):
+    for n, fn in enumerate(hkl):
         tmp = loadobj(fn, "hkl_table")
         tmp.batch = n * np.ones_like(tmp.op)
         tabs.append(tmp)
 
     hkl = HKLTable.concatenate(tabs)
+    logger.info("Total reflections loaded: {}", len(hkl))
 
-    print("Grouping redundant observations")
+    logger.info("Grouping redundant observations...")
     (h, k, l), index_map, counts = hkl.unique()
 
     S = ScaledData(
@@ -94,27 +112,28 @@ def run(args=None):
 
     MR = BatchModelRefiner(S)
 
-    if args.scale is not None:
-        for fn, refiner in zip(args.scale, MR._batch_refiners):
+    if scale is not None:
+        logger.info("Loading scaling models...")
+        for fn, refiner in zip(scale, MR.batch_refiners):
             a = nxload(fn)
-            if not args.no_absorption and ("absorption_model" in a.entry.keys()):
+            if apply_absorption and ("absorption_model" in a.entry.keys()):
                 refiner.absorption.model = loadobj(fn, "absorption_model")
-            if not args.no_offset and ("offset_model" in a.entry.keys()):
+            if apply_offset and ("offset_model" in a.entry.keys()):
                 refiner.offset.model = loadobj(fn, "offset_model")
-            if not args.no_detector and ("detector_model" in a.entry.keys()):
+            if apply_detector and ("detector_model" in a.entry.keys()):
                 refiner.detector.model = loadobj(fn, "detector_model")
-            if not args.no_scaling and ("scaling_model" in a.entry.keys()):
+            if apply_scaling and ("scaling_model" in a.entry.keys()):
                 refiner.scaling.model = loadobj(fn, "scaling_model")
 
-    print("applying scale factors")
+    logger.info("Applying scale factors...")
     MR.apply()
-    print("merging")
+    logger.info("Merging observations...")
     Im, sigmam, counts = MR.data.merge()
 
-    if args.outlier is not None:
-        nout = MR.data.mask_outliers(Im, args.outlier)
-        print(f"removed {nout} outliers > {args.outlier} sigma")
-        print("merging again")
+    if outlier is not None:
+        nout = MR.data.mask_outliers(Im, outlier)
+        logger.info("Removed {} outliers (>{} sigma)", nout, outlier)
+        logger.info("Merging again...")
         Im, sigmam, counts = MR.data.merge()
 
     cols = dict(
@@ -123,30 +142,28 @@ def run(args=None):
         count=counts.astype(np.int32),
     )
 
-    if args.split is not None:
-        if args.split == "weightedRandomHalf":
-            print("Splitting according to the weighted random half algorithm")
+    if split is not None:
+        if split == "weightedRandomHalf":
+            logger.info("Splitting by weighted random half algorithm...")
             w = 1 / MR.data.sigma**2
             isgrp1 = wrs(index_map, w.filled(fill_value=0))
             groups = [isgrp1, ~isgrp1]
-        elif args.split == "randomHalf":
-            print("Splitting into random half-datasets (unweighted)")
+        elif split == "randomHalf":
+            logger.info("Splitting into random half-datasets (unweighted)...")
             isgrp1 = wrs(index_map, np.ones_like(index_map))
             groups = [isgrp1, ~isgrp1]
-        elif args.split == "Friedel":
-            print("Splitting into Friedel pairs")
-            if args.geometry is None:
-                raise ("--geometry argument is required for symmetry-based splitting")
-            symm = loadobj(args.geometry, "symmetry")
+        elif split == "Friedel":
+            logger.info("Splitting into Friedel pairs...")
+            symm = loadobj(geometry, "symmetry")
             has_inversion = np.array([np.linalg.det(op) for op in symm.laue_group_operators]) < 0
             isminus = has_inversion[hkl.op]
             groups = [~isminus, isminus]
         else:
-            raise ("something bad happened")
+            raise ValueError(f"Unhandled merge mode: {split!r}")
         for j, g in enumerate(groups):
             G = MR.data.copy()
             G.mask = G.mask | ~g
-            print(f"Merging group {j}")
+            logger.info("Merging group {}...", j)
             Imj, sigmamj, countsj = G.merge()
             cols[f"group_{j}_intensity"] = Imj.filled(fill_value=np.nan).astype(np.float32)
             cols[f"group_{j}_intensity_error"] = sigmamj.filled(fill_value=np.nan).astype(np.float32)
@@ -154,6 +171,7 @@ def run(args=None):
 
     # create the output table object
     hkl_table = HKLTable(h, k, l, ndiv=hkl.ndiv, **cols)
+    logger.info("Unique reflections in merged output: {}", len(hkl_table))
 
     # ndiv = T.ndiv # save for later
 
@@ -180,9 +198,16 @@ def run(args=None):
     # hkl_table = HKLTable.from_frame(df_merged)
     # hkl_table.ndiv = ndiv # lost in conversion to/from dataframe
 
-    saveobj(hkl_table, args.outfile, name="hkl_table", append=False)
+    logger.info("Saving merged data to {}...", outfile)
+    saveobj(hkl_table, outfile, name="hkl_table", append=False)
+    logger.info("Merge completed successfully")
 
-    print("done!")
+
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
+
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_merge))
 
 
 if __name__ == "__main__":

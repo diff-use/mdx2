@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-DATADIR="/nfs/chess/scratch/user/spm82/data/insulin"
+DATADIR="/fs/cbsuandofs1/storage/archive/data/xray/chess_f1_2017_06/insulin"
 SUBS="1_1 1_2 1_3 1_4 1_5 1_6 1_7 1_8 1_9 2_1 2_2 2_3 2_4 2_5 2_6 2_7 2_8"
 mkdir -p dials
 cd dials

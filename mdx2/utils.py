@@ -1,72 +1,46 @@
-import importlib
-import logging
+import warnings
 
 import numpy as np
-from nexusformat.nexus import NXentry, NXroot
-from nexusformat.nexus import nxload as nexus_nxload
 from scipy.ndimage import map_coordinates
 
-import mdx2
 
-# FUNCTIONS FOR LOADING AND SAVING MDX2 CLASSES TO NEXUS FILES
-
-
-def nxload(filename, mode="r", **kwargs):
-    """Wrapper around nexusformat.nexus.nxload to check mdx2 version."""
-    nxroot = nexus_nxload(filename, mode=mode, **kwargs)
-    mdx2_version_file = nxroot.attrs.get("mdx2_version")
-    if mdx2_version_file != mdx2.__version__:
-        logging.warning(
-            f"mdx2 version mismatch: file version {mdx2_version_file}, installed version {mdx2.__version__}"
-        )
-    return nxroot
+# DEPRECATED: Import I/O functions for backward compatibility
+# These will be removed in a future version
+def _deprecated_import(name, new_module="mdx2.io"):
+    """Issue a deprecation warning when importing from utils instead of io"""
+    warnings.warn(
+        f"Importing '{name}' from mdx2.utils is deprecated and will be removed in a future version. "
+        f"Please import from {new_module} instead: 'from {new_module} import {name}'",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
-def nxsave(nxsobj, filename, mode="w", **kwargs):
-    """Wrapper around nexusformat.nexus.nxsave to add mdx2 version."""
-    nxroot = NXroot(NXentry(nxsobj))
-    nxroot.attrs["mdx2_version"] = mdx2.__version__
-    nxroot.save(filename, mode=mode, **kwargs)
-    return nxroot
+def __getattr__(name):
+    """Lazy import with deprecation warning for I/O functions"""
+    io_functions = ["nxload", "nxsave", "loadobj", "saveobj"]
+    if name in io_functions:
+        _deprecated_import(name)
+        from mdx2 import io
+
+        return getattr(io, name)
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
-def loadobj(filename, objectname, verbose=True):
-    # simple wrapper to load mdx2 objects from nxs files
-    # handles import using the mdx2_module and mdx2_class attributes
-    # does a from_nexus() call to instantiate the class
-    print(f"Reading {objectname} from {filename}")
-    nxroot = nxload(filename, "r")
-    mdx2_version_file = nxroot.attrs.get("mdx2_version")
-    if mdx2_version_file != mdx2.__version__:
-        pass  # TODO: handle version mismatch
-    nxs = nxroot["/entry/" + objectname]
-    mod = nxs.attrs["mdx2_module"]
-    cls = nxs.attrs["mdx2_class"]
-    _tmp = importlib.__import__(mod, fromlist=[cls])
-    Class = getattr(_tmp, cls)
-    if verbose:
-        print(f"  importing as {cls} from {mod}")
-    return Class.from_nexus(nxs)
-
-
-def saveobj(obj, filename, name=None, append=False, verbose=True, mode="w"):
-    # simple wrapper to save mdx2 objects as nxs files
-    #
-    if verbose:
-        print(f"Exporting {type(obj)} to nexus object")
-    nxsobj = obj.to_nexus()
-    if name is not None:
-        nxsobj.rename(name)
-    if verbose:
-        print(f"  writing {nxsobj.nxname} to {filename}")
-    nxsobj.attrs["mdx2_module"] = type(obj).__module__
-    nxsobj.attrs["mdx2_class"] = type(obj).__name__
-    if append:
-        root = nxload(filename, "r+")
-        root["entry/" + nxsobj.nxname] = nxsobj
-    else:
-        nxsave(nxsobj, filename, mode=mode)
-    return nxsobj
+# Explicitly list what's available from this module for backwards compatibility
+__all__ = [
+    # Numerical functions (current)
+    "interp_g2g_bilinear",
+    "interp_g2g_trilinear",
+    "interp3",
+    "interp2",
+    "slice_sections",
+    # I/O functions (deprecated, imported from mdx2.io)
+    "nxload",
+    "nxsave",
+    "loadobj",
+    "saveobj",
+]
 
 
 # FUNCTIONS FOR EFFICIENT LINEAR INTERPOLATION

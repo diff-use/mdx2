@@ -129,7 +129,32 @@ class InterpLin3:
 
     @property
     def B(self):
-        raise NotImplementedError
+        Nx, Ny, Nz = self.shape
+        k, l, m = np.meshgrid(np.arange(Nx), np.arange(Ny), np.arange(Nz), indexing="ij")
+
+        # Neighbor indices
+        right = self._sub2ind(k[1:, :, :], l[1:, :, :], m[1:, :, :]).ravel(order="F")
+        left = self._sub2ind(k[:-1, :, :], l[:-1, :, :], m[:-1, :, :]).ravel(order="F")
+        up = self._sub2ind(k[:, 1:, :], l[:, 1:, :], m[:, 1:, :]).ravel(order="F")
+        down = self._sub2ind(k[:, :-1, :], l[:, :-1, :], m[:, :-1, :]).ravel(order="F")
+        front = self._sub2ind(k[:, :, :-1], l[:, :, :-1], m[:, :, :-1]).ravel(order="F")
+        back = self._sub2ind(k[:, :, 1:], l[:, :, 1:], m[:, :, 1:]).ravel(order="F")
+
+        # Flatten all neighbor indices
+        row_index = np.concatenate((left, right, down, up, front, back))
+        col_index = np.concatenate((right, left, up, down, back, front))
+        vals = np.ones_like(row_index, dtype=np.double)
+        shape = (Nx * Ny * Nz, Nx * Ny * Nz)
+        L = sparse.coo_matrix((vals, (row_index, col_index)), shape=shape)
+
+        # Weight according to number of neighbors
+        # NOTE: this may fail if Nx=Ny=Nz=1
+        nn = np.asarray(L.sum(axis=1)).flatten()
+        W = sparse.diags(1 / nn)
+        L = W @ L
+
+        # Center minus average of neighbors
+        return sparse.eye(shape[0]) - L
 
     @property
     def Bxy(self):
@@ -652,6 +677,15 @@ class ScaledData:
         sigmam = 1 / np.sqrt(wm)
         return Im, sigmam, counts
 
+    def mask_singletons(self):
+        """Mask out reflections that only have one observation"""
+        n = self._ihmax + 1
+        counts = np.bincount(self._ih, minlength=n, weights=~self.mask)
+        singletons = counts <= 1
+        is_singleton = singletons[self._ih] & ~(self.mask)
+        self.mask[is_singleton] = True  # apply singleton masks
+        return is_singleton.sum()
+
     def mask_outliers(self, Im, nsigma):
         resid = (self.scale * (Im[self._ih] + self.offset) - self._I) / self._sigma
         isoutlier = (resid > nsigma) & ~(self.mask)
@@ -994,6 +1028,20 @@ class BatchModelRefiner:
             self._batch_refiners.append(CombinedModelRefiner(ds, sm, am, om, detector_model))
 
         self.detector = DetectorModelRefiner(data, detector_model)
+
+    @property
+    def batch_refiners(self):
+        """Access individual batch model refiners.
+
+        Returns an iterator over CombinedModelRefiner instances, one per batch.
+        This allows external code to iterate over refiners or access their models
+        without directly coupling to the internal _batch_refiners implementation.
+
+        Example:
+            for refiner in batch_model_refiner.batch_refiners:
+                model = refiner.scaling.model
+        """
+        return iter(self._batch_refiners)
 
     def add_scaling_models(self, *args, **kwargs):
         [br.scaling.add_model(*args, **kwargs) for br in self._batch_refiners]

@@ -1,11 +1,10 @@
 import re
-from multiprocessing import JoinableQueue, Process
 
 import numpy as np
 from cctbx.eltbx import attenuation_coefficient
 from dxtbx import flumpy
+from dxtbx.format.FormatPilatusHelpers import sensor_active_areas
 from dxtbx.model.experiment_list import ExperimentList
-from joblib import Parallel, delayed
 from scitbx import matrix
 
 
@@ -18,6 +17,61 @@ class Experiment:
         self._panel = expt.detector[0]  # single-panel detectors assumed
         self._scan = expt.scan
         self._beam = expt.beam
+
+        # check compatibility
+        try:
+            # Check that we have exactly one panel
+            if len(expt.detector) != 1:
+                raise RuntimeError(
+                    f"Experiment detector has {len(expt.detector)} panels; mdx2 requires single-panel detectors"
+                )
+
+            # Check that the panel type is SENSOR_PAD
+            if self._panel.get_type() != "SENSOR_PAD":
+                raise RuntimeError(
+                    f"Experiment detector type is '{self._panel.get_type()}'; mdx2 requires SENSOR_PAD detectors"
+                )
+
+            # Check that the detector is in the known database using public API
+            active_areas = sensor_active_areas((self._panel,))
+            if active_areas is None or len(active_areas) == 0:
+                raise RuntimeError(
+                    "Experiment detector geometry not found in dxtbx detector database; "
+                    "mdx2 may not be compatible with this detector type"
+                )
+
+            # Extract the first (and only) active area tuple
+            active_area = active_areas[0]
+            # Note: active_area is (fast_start, slow_start, fast_end, slow_end)
+            fast_start, slow_start, fast_end, slow_end = active_area
+            image_size = self._panel.get_image_size()  # (fast, slow)
+
+            # Module size is the active area dimension
+            self._module_size_slow = slow_end - slow_start
+            self._module_size_fast = fast_end - fast_start
+
+            # Calculate number of modules in each direction
+            # image_size is (fast, slow), so image_size[1] is slow, image_size[0] is fast
+            num_modules_slow = image_size[1] // self._module_size_slow
+            num_modules_fast = image_size[0] // self._module_size_fast
+
+            # Calculate gap sizes
+            if num_modules_slow > 1:
+                total_gap_slow = image_size[1] - (num_modules_slow * self._module_size_slow)
+                self._gap_slow = total_gap_slow // (num_modules_slow - 1)
+            else:
+                self._gap_slow = 0
+
+            if num_modules_fast > 1:
+                total_gap_fast = image_size[0] - (num_modules_fast * self._module_size_fast)
+                self._gap_fast = total_gap_fast // (num_modules_fast - 1)
+            else:
+                self._gap_fast = 0
+
+        except (AssertionError, RuntimeError) as e:
+            raise RuntimeError(f"Experiment detector not compatible with mdx2: {e}") from e
+        except Exception as e:
+            raise RuntimeError(f"Unexpected error checking detector compatibility: {e}") from e
 
     @staticmethod
     def from_file(exptfile):
@@ -46,8 +100,23 @@ class Experiment:
         return nimgs
 
     @property
+    def panel_offset(self):
+        """offset in pixels (stride) of successive panels in the image file"""
+        row_size = self._module_size_slow + self._gap_slow
+        col_size = self._module_size_fast + self._gap_fast
+        return row_size, col_size
+
+    @property
     def exposure_times(self):
-        return np.array(tuple(self._scan.get_exposure_times()))
+        dt = np.array(tuple(self._scan.get_exposure_times()))
+        # NOTE: different versions of dxtbx encode exposure times differently.
+        # TODO: implement checks for dxtbx version mismatchs and resolve before errors occur.
+
+        # Fix a bug in dxtbx. When cbf files are imported without reading all the headers,
+        # only the first element in the list of exposure times is set, and the rest are zero.
+        if np.count_nonzero(dt) == 1 and dt[0] > 0:
+            dt[:] = dt[0]
+        return dt
 
     @property
     def space_group_number(self):
@@ -270,10 +339,8 @@ class ImageSet:
         nx, ny = det.get_image_size()
         return (ny, nx)
 
-    def read_frame(self, ind, verbose=True, maskval=-1):
+    def read_frame(self, ind, maskval=-1):
         # for now, apply mask by default and return just the image as an ndarray
-        if verbose:
-            print(f"{self.__class__.__name__}: reading frame {ind}")
         im = self._iset.get_raw_data(ind)[0]
         msk = self._iset.get_mask(ind)[0]
         msk = ~msk
@@ -292,48 +359,10 @@ class ImageSet:
 
         return np.stack(stack)
 
-    def read_all(self, target_array, buffer=1):
-        nframes = self.num_frames
-
-        if buffer == 1:
-            for start in range(0, nframes):
-                target_array[start, :, :] = self.read_frame(start)
-        else:
-            for start in range(0, nframes, buffer):
-                stop = min(start + buffer, nframes)
-                target_array[start:stop, :, :] = self.read_stack(start, stop)
-
-    def read_all_parallel(self, target_array, buffer=1, nproc=1, verbose=True):
-        def nxswriter(q):
-            while True:
-                val = q.get()
-                if val is None:
-                    break
-                start, stop, arr = val  # unpack the tuple
-                if verbose:
-                    print(f"{self.__class__.__name__}: writing block to nexus file: {start}-{stop}")
-                target_array[start:stop, :, :] = arr
-                q.task_done()
-            # Finish up
-            q.task_done()
-
-        q = JoinableQueue(maxsize=2)
-        writeprocess = Process(target=nxswriter, args=(q,))
-        writeprocess.start()
-
-        nframes = self.num_frames
-        with Parallel(n_jobs=nproc) as parallel:
-            for start in range(0, nframes, buffer):
-                stop = min(start + buffer, nframes)
-                res = parallel(delayed(self.read_frame)(ind) for ind in range(start, stop))
-                q.put((start, stop, np.stack(res)))
-        q.put(None)  # Poison pill
-        q.join()
-        writeprocess.join()
-
 
 def calc_rotation_matrix_at_phi(goniometer, phi_vals_deg):
-    assert goniometer.num_scan_points == 0  # scan varying settings not implemented here
+    if goniometer.num_scan_points != 0:
+        raise NotImplementedError("scan-varying goniometer not supported here")
     # get the S matrix
     S = goniometer.get_setting_rotation()
     S = np.array(S).reshape([3, 3])
@@ -362,14 +391,24 @@ def interp_rotation_matrices(U1, U2, rotation_fraction):
 
 
 def calc_U_matrix_at_phi(crystal, scan, phi_vals_deg):
-    assert crystal.num_scan_points > 0  # use for a scan-varying model only
-    base, frac = phi_to_base_fraction_index(scan, phi_vals_deg)
-    U = np.empty([np.size(base), 3, 3])
-    for ind, (b, f) in enumerate(zip(base, frac)):
-        U1 = crystal.get_U_at_scan_point(b)
-        U2 = crystal.get_U_at_scan_point(b + 1)
-        Uvals = interp_rotation_matrices(U1, U2, f)
-        U[ind, :, :] = np.array(Uvals).reshape(3, 3)
+    if crystal.num_scan_points == 0:
+        U = np.array(crystal.get_U()).reshape(3, 3)
+        U = np.tile(U, (np.size(phi_vals_deg), 1, 1))
+    else:
+        base, frac = phi_to_base_fraction_index(scan, phi_vals_deg)
+        imax = crystal.num_scan_points
+        U = np.empty([np.size(base), 3, 3])
+        for ind, (b, f) in enumerate(zip(base, frac)):
+            U1 = crystal.get_U_at_scan_point(b)
+            # Handle boundary: clamp second index to valid range
+            b2 = min(b + 1, imax - 1)
+            if b2 == b:
+                # At the boundary, use U1 directly without interpolation
+                Uvals = U1
+            else:
+                U2 = crystal.get_U_at_scan_point(b2)
+                Uvals = interp_rotation_matrices(U1, U2, f)
+            U[ind, :, :] = np.array(Uvals).reshape(3, 3)
     return U
 
 
@@ -399,13 +438,23 @@ def phi_to_base_fraction_index(scan, phi_vals_deg):
 
 
 def calc_B_matrix_at_phi(crystal, scan, phi_vals_deg):
-    assert crystal.num_scan_points > 0  # use for a scan-varying model only
-    base, frac = phi_to_base_fraction_index(scan, phi_vals_deg)
-    B = np.empty([np.size(base), 3, 3])
-    for ind, (b, f) in enumerate(zip(base, frac)):
-        B1 = np.array(crystal.get_B_at_scan_point(b)).reshape([3, 3])
-        B2 = np.array(crystal.get_B_at_scan_point(b + 1)).reshape([3, 3])
-        B[ind, :, :] = B1 * (1 - f) + B2 * f  # element-wise linear interpolation
+    if crystal.num_scan_points == 0:
+        B = np.array(crystal.get_B()).reshape(3, 3)
+        B = np.tile(B, (np.size(phi_vals_deg), 1, 1))
+    else:
+        base, frac = phi_to_base_fraction_index(scan, phi_vals_deg)
+        imax = crystal.num_scan_points
+        B = np.empty([np.size(base), 3, 3])
+        for ind, (b, f) in enumerate(zip(base, frac)):
+            B1 = np.array(crystal.get_B_at_scan_point(b)).reshape([3, 3])
+            # Handle boundary: clamp second index to valid range
+            b2 = min(b + 1, imax - 1)
+            if b2 == b:
+                # At the boundary, use B1 directly without interpolation
+                B[ind, :, :] = B1
+            else:
+                B2 = np.array(crystal.get_B_at_scan_point(b2)).reshape([3, 3])
+                B[ind, :, :] = B1 * (1 - f) + B2 * f  # element-wise linear interpolation
     return B
 
 

@@ -19,11 +19,14 @@ dependencies = [
     "nexusformat",
     "joblib",
     "numexpr",
+    "simple-parsing",
+    "loguru",
 ]
 # dxtbx needs to be installed with conda
 
 [project.optional-dependencies]
 test = ["pytest>=6.0"]
+dev = ["ruff>=0.1.0", "pytest>=6.0"]
 
 [project.urls]
 repository = "https://github.com/diff-use/mdx2"
@@ -41,6 +44,7 @@ repository = "https://github.com/diff-use/mdx2"
 "mdx2.merge" = "mdx2.command_line.merge:run"
 "mdx2.map" = "mdx2.command_line.map:run"
 "mdx2.scale" = "mdx2.command_line.scale:run"
+"mdx2.reintegrate" = "mdx2.command_line.reintegrate:run"
 
 [tool.setuptools.dynamic]
 version = {file = "mdx2/VERSION"}

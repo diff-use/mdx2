@@ -2,10 +2,11 @@ import re
 
 import h5py as h5
 import numpy as np
+import pytest
 
 from mdx2 import __version__ as mdx2_version
 from mdx2.geometry import Crystal
-from mdx2.utils import nxload, nxsave
+from mdx2.io import nxload, nxsave
 
 
 def test_mdx2_version_number():
@@ -38,7 +39,7 @@ def test_mdx2_utils_nxsave(tmp_path):
         assert f.attrs["mdx2_version"] == mdx2_version
 
 
-def test_mdx2_utils_nxload(tmp_path, caplog):
+def test_mdx2_utils_nxload(tmp_path):
     """check that mdx2.utils.nxload logs a warning if the version number does not match"""
 
     crystal = Crystal(
@@ -57,6 +58,6 @@ def test_mdx2_utils_nxload(tmp_path, caplog):
     with h5.File(filename, "a") as f:
         f.attrs["mdx2_version"] = "0.0.0"
 
-    # loading should now raise an error
-    _ = nxload(filename)
-    assert "mdx2 version mismatch" in caplog.text
+    # loading should now issue a warning
+    with pytest.warns(UserWarning, match="mdx2 version mismatch"):
+        _ = nxload(filename)

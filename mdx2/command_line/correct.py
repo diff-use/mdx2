@@ -2,103 +2,108 @@
 Apply corrections to integrated data
 """
 
-import argparse
+from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
+from loguru import logger
+from simple_parsing import field  # pip install simple-parsing
 
-from mdx2.utils import loadobj, saveobj
-
-
-def parse_arguments():
-    """Parse commandline arguments"""
-
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-
-    # Required arguments
-    parser.add_argument("geom", help="NeXus file with miller_index")
-    parser.add_argument("hkl", help="NeXus file with hkl_table")
-    parser.add_argument("--background", help="NeXus file with background map")
-    parser.add_argument("--attenuation", metavar="TF", default=True, help="apply attenuation correction?")
-    parser.add_argument("--efficiency", metavar="TF", default=True, help="apply efficiency correction?")
-    parser.add_argument("--polarization", metavar="TF", default=True, help="apply polarization correction?")
-    parser.add_argument("--lorentz", metavar="TF", default=False, help="apply Lorentz correction?")
-    parser.add_argument(
-        "--p1", action="store_true", help="map Miller indices to asymmetric unit for P1 (Friedel symmetry only)"
-    )
-    parser.add_argument("--outfile", default="corrected.nxs", help="name of the output NeXus file")
-
-    return parser
+from mdx2.command_line import make_argument_parser, with_logging, with_parsing
+from mdx2.io import loadobj, saveobj
 
 
-def run(args=None):
-    parser = parse_arguments()
-    args = parser.parse_args(args)
+@dataclass
+class Parameters:
+    """Options for applying corrections to integrated data"""
 
-    # fix argparse ~bug where booleans are given as strings
-    for arg in ["attenuation", "efficiency", "polarization", "lorentz"]:
-        if getattr(args, arg) in ["True", "true", "T", "t"]:
-            setattr(args, arg, True)
-        else:
-            setattr(args, arg, False)
+    geom: str = field(positional=True)  # NeXus data file containing miller_index
+    hkl: str = field(positional=True)  # NeXus data file containing hkl_table
+    background: Optional[str] = None  # NeXus file with background map
+    attenuation: bool = True  # apply attenuation correction
+    efficiency: bool = True  # apply efficiency correction
+    polarization: bool = True  # apply polarization correction
+    lorentz: bool = False  # apply Lorentz correction
+    p1: bool = False  # map Miller indices to asymmetric unit for P1 (Friedel symmetry only)
+    outfile: str = "corrected.nxs"  # name of the output NeXus file
 
-    T = loadobj(args.hkl, "hkl_table")
+
+def run_correct(params):
+    """Run the correct script"""
+    hkl = params.hkl
+    geom = params.geom
+    background = params.background
+    outfile = params.outfile
+    p1 = params.p1
+    attenuation = params.attenuation
+    efficiency = params.efficiency
+    polarization = params.polarization
+    lorentz = params.lorentz
+
+    logger.info("Loading integrated data and geometry...")
+    T = loadobj(hkl, "hkl_table")
 
     # hack to work with older versions
     if "_ndiv" in T.__dict__:
         T.ndiv = T._ndiv
         del T._ndiv
 
-    Corrections = loadobj(args.geom, "corrections")
-    Crystal = loadobj(args.geom, "crystal")
+    Corrections = loadobj(geom, "corrections")
+    Crystal = loadobj(geom, "crystal")
 
-    if args.p1:
-        print("ignoring space group information and using P1 symmetry only")
+    if p1:
+        logger.info("Using P1 symmetry only (ignoring space group)")
         Symmetry = None
     else:
-        Symmetry = loadobj(args.geom, "symmetry")
+        Symmetry = loadobj(geom, "symmetry")
 
     UB = Crystal.ub_matrix
 
-    # computing scattering vector magnitude
-    print("calculating scattering vector magnitude (s)")
+    logger.info("Calculating scattering vector magnitudes...")
     s = UB @ np.stack((T.h, T.k, T.l))
     T.s = np.sqrt(np.sum(s * s, axis=0))
 
-    # map h,k,l to asymmetric unit
-    print("mapping Miller indices to the asymmetric unit")
+    logger.info("Mapping Miller indices to asymmetric unit...")
     T = T.to_asu(Symmetry)
 
     # apply corrections to intensities
-
+    logger.info("Interpolating correction factors...")
     Cinterp = Corrections.interpolate(T.iy, T.ix)
 
     count_rate = T.counts / T.seconds
     count_rate_error = np.sqrt(T.counts) / T.seconds
 
-    if args.background is not None:
-        Bkg = loadobj(args.background, "binned_image_series")
+    if background is not None:
+        Bkg = loadobj(background, "binned_image_series")
         bkg_count_rate = Bkg.interpolate(T.phi, T.iy, T.ix)
-        print("subtracting background from count rate")
+        logger.info("Subtracting background from count rate")
         count_rate = count_rate - bkg_count_rate
 
-    solid_angle = Cinterp["solid_angle"]
+    solid_angle = Cinterp["solid_angle"].copy()
 
-    for corr in ["attenuation", "efficiency", "polarization"]:
-        if getattr(args, corr):
-            print("correcting solid angle for", corr)
-            solid_angle *= Cinterp[corr]
+    corrections_applied = []
+    if attenuation:
+        solid_angle *= Cinterp["attenuation"]
+        corrections_applied.append("attenuation")
+    if efficiency:
+        solid_angle *= Cinterp["efficiency"]
+        corrections_applied.append("efficiency")
+    if polarization:
+        solid_angle *= Cinterp["polarization"]
+        corrections_applied.append("polarization")
 
-    print("computing the swept reciprocal space volume fraction (rs_volume)")
+    if corrections_applied:
+        logger.info("Applied corrections: {}", ", ".join(corrections_applied))
+
+    logger.info("Computing reciprocal space volume fractions...")
     T.rs_volume = T.pixels * Cinterp["d3s"] / np.linalg.det(UB)
 
-    print("computing intensity and intensity_error")
+    logger.info("Computing intensities and errors...")
     T.intensity = count_rate / solid_angle
     T.intensity_error = count_rate_error / solid_angle
 
-    if args.lorentz:
+    if lorentz:
+        logger.info("Applying Lorentz correction")
         T.intensity *= T.rs_volume
         T.intensity_error *= T.rs_volume
 
@@ -121,9 +126,17 @@ def run(args=None):
     T.n = T.n.astype(np.int32)
     T.op = T.op.astype(np.int32)
 
-    saveobj(T, args.outfile, name="hkl_table", append=False)
+    logger.info("Reflections processed: {}", len(T))
+    logger.info("Saving corrected data to {}...", outfile)
+    saveobj(T, outfile, name="hkl_table", append=False)
+    logger.info("Corrections completed successfully")
 
-    print("done!")
+
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
+
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_correct))
 
 
 if __name__ == "__main__":

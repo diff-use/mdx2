@@ -2,56 +2,57 @@
 Create a map from data in an hkl table
 """
 
-import argparse
+from dataclasses import dataclass
+from typing import Tuple
 
 import numpy as np
+from loguru import logger
+from simple_parsing import field
 
+from mdx2.command_line import make_argument_parser, with_logging, with_parsing
 from mdx2.data import HKLTable
 from mdx2.geometry import GridData
-from mdx2.utils import loadobj, saveobj
+from mdx2.io import loadobj, saveobj
 
 
-def parse_arguments():
-    """Parse commandline arguments"""
+@dataclass
+class Parameters:
+    """Options for creating an array from an hkl table"""
 
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
+    geom: str = field(positional=True)  # NeXus file containing symmetry and crystal
+    hkl: str = field(positional=True)  # NeXus file containing hkl_table
+    symmetry: bool = True  # apply symmetry operators
+    limits: Tuple[float, float, float, float, float, float] = (0, 10, 0, 10, 0, 10)
+    """limits for the hkl grid (hmin, hmax, kmin, kmax, lmin, lmax)"""
+    signal: str = "intensity"  # column in hkl_table to map
+    outfile: str = "map.nxs"  # name of the output NeXus file
 
-    # Required arguments
-    parser.add_argument("geom", help="NeXus file with symmetry and crystal")
-    parser.add_argument("hkl", help="NeXus file with hkl_table")
-    parser.add_argument("--symmetry", default="True", metavar="TF", help="apply symmetry operators?")
-    parser.add_argument(
-        "--limits",
-        default=[0, 10, 0, 10, 0, 10],
-        type=float,
-        nargs=6,
-        metavar=("H1", "H2", "K1", "K2", "L1", "L2"),
-        help="region to map",
-    )
-    parser.add_argument("--signal", default="intensity", help="column in hkl_table to map")
-    parser.add_argument("--outfile", default="map.nxs", help="name of the output NeXus file")
-
-    return parser
+    def __post_init__(self):
+        """Validate limits parameter"""
+        hmin, hmax, kmin, kmax, lmin, lmax = self.limits
+        if hmin > hmax:
+            raise ValueError(f"limits: hmin must be <= hmax, got hmin={hmin}, hmax={hmax}")
+        if kmin > kmax:
+            raise ValueError(f"limits: kmin must be <= kmax, got kmin={kmin}, kmax={kmax}")
+        if lmin > lmax:
+            raise ValueError(f"limits: lmin must be <= lmax, got lmin={lmin}, lmax={lmax}")
 
 
-def run(args=None):
-    parser = parse_arguments()
-    args = parser.parse_args(args)
+# NOTE: should perhaps change so that limits is a required argument
 
-    # fix argparse ~bug where booleans are given as strings
-    for arg in ["symmetry"]:
-        if getattr(args, arg) in ["True", "true", "T", "t"]:
-            setattr(args, arg, True)
-        else:
-            setattr(args, arg, False)
 
-    T = loadobj(args.hkl, "hkl_table")
-    Symmetry = loadobj(args.geom, "symmetry")  # used only if symmetry flag is set
-    signal = args.signal
-    hmin, hmax, kmin, kmax, lmin, lmax = args.limits
+def run_map(params):
+    """Run the map script"""
+    hkl = params.hkl
+    geom = params.geom
+    outfile = params.outfile
+    apply_symmetry = params.symmetry
+    signal = params.signal
+    hmin, hmax, kmin, kmax, lmin, lmax = params.limits
+
+    logger.info("Loading HKL table and geometry...")
+    T = loadobj(hkl, "hkl_table")
+    Symmetry = loadobj(geom, "symmetry")  # used only if symmetry flag is set
     ndiv = T.ndiv
 
     Hmin = np.round(hmin * ndiv[0]).astype(int)
@@ -65,30 +66,34 @@ def run(args=None):
     k_axis = np.arange(Kmin, Kmax + 1) / ndiv[1]
     l_axis = np.arange(Lmin, Lmax + 1) / ndiv[2]
 
-    print("map region:")
-    print(f"  h from {h_axis[0]} to {h_axis[-1]} ({h_axis.size} grid points)")
-    print(f"  k from {k_axis[0]} to {k_axis[-1]} ({k_axis.size} grid points)")
-    print(f"  l from {l_axis[0]} to {l_axis[-1]} ({l_axis.size} grid points)")
+    logger.info("Map region:")
+    logger.info("  h: {} to {} ({} points)", h_axis[0], h_axis[-1], h_axis.size)
+    logger.info("  k: {} to {} ({} points)", k_axis[0], k_axis[-1], k_axis.size)
+    logger.info("  l: {} to {} ({} points)", l_axis[0], l_axis[-1], l_axis.size)
 
-    print("generating Miller index array")
+    logger.info("Generating Miller index grid...")
     h, k, l = np.meshgrid(h_axis, k_axis, l_axis, indexing="ij")
 
     Tgrid = HKLTable(h.ravel(), k.ravel(), l.ravel(), ndiv=ndiv)
 
-    if args.symmetry:
-        print("mapping Miller indices to asymmetric unit")
+    if apply_symmetry:
+        logger.info("Mapping Miller indices to asymmetric unit...")
         Tgrid = Tgrid.to_asu(Symmetry)
 
-    print(f"looking up {args.signal} in data table")
-    # lookup in the table
+    logger.info("Looking up '{}' values in data table...", signal)
     data = T.lookup(Tgrid.h, Tgrid.k, Tgrid.l, signal).reshape(h.shape)
 
-    print("preparing output array")
+    logger.info("Saving map to {}...", outfile)
     G = GridData((h_axis, k_axis, l_axis), data, axes_names=["h", "k", "l"])
-    saveobj(G, args.outfile, name=signal, append=False)
+    saveobj(G, outfile, name=signal, append=False)
+    logger.info("Map creation completed successfully")
 
-    print("done!")
 
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
+
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_map))
 
 if __name__ == "__main__":
     run()
