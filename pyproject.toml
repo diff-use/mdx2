@@ -21,6 +21,7 @@ dependencies = [
     "numexpr",
     "simple-parsing",
     "loguru",
+    "numba",
 ]
 # dxtbx needs to be installed with conda
 
