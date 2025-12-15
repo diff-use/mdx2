@@ -1,7 +1,7 @@
 import warnings
 
 import numpy as np
-from scipy.ndimage import map_coordinates
+from numba import float64, jit
 
 
 # DEPRECATED: Import I/O functions for backward compatibility
@@ -21,7 +21,7 @@ def __getattr__(name):
     io_functions = ["nxload", "nxsave", "loadobj", "saveobj"]
     if name in io_functions:
         _deprecated_import(name)
-        from mdx2 import io
+        from mdx2 import io  # noqa: PLC0415
 
         return getattr(io, name)
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
@@ -30,117 +30,18 @@ def __getattr__(name):
 # Explicitly list what's available from this module for backwards compatibility
 __all__ = [
     # Numerical functions (current)
+    "histogram",
     "interp_g2g_bilinear",
     "interp_g2g_trilinear",
     "interp3",
     "interp2",
     "slice_sections",
     # I/O functions (deprecated, imported from mdx2.io)
-    "nxload",
-    "nxsave",
-    "loadobj",
-    "saveobj",
+    "nxload",  # noqa: F822
+    "nxsave",  # noqa: F822
+    "loadobj",  # noqa: F822
+    "saveobj",  # noqa: F822
 ]
-
-
-# FUNCTIONS FOR EFFICIENT LINEAR INTERPOLATION
-
-
-def _bilinear_g2g(d0, b, f):
-    def clip_data(d0, b):
-        bx, by = b
-        # just get the grid points I need
-        d0 = d0[bx[0] : (bx[-1] + 2), by[0] : (by[-1] + 2), ...]
-        bx = bx - bx[0]
-        by = by - by[0]
-        b = (bx, by)
-        return d0, b
-
-    d0, b = clip_data(d0, b)
-
-    bx, by = b
-    fx, fy = f
-    dx, dy, _ = np.meshgrid(fx, fy, [1], indexing="ij", sparse=True)
-
-    if len(d0.shape) == 2:
-        d0 = d0[:, :, np.newaxis]
-
-    c0 = d0[bx, :-1, ...] * (1 - dx) + d0[bx + 1, :-1, ...] * dx
-    c1 = d0[bx, 1:, ...] * (1 - dx) + d0[bx + 1, 1:, ...] * dx
-    c = c0[:, by, ...] * (1 - dy) + c1[:, by, ...] * dy
-
-    if c.shape[2] == 1:
-        c = np.squeeze(c, axis=2)
-
-    return c
-
-
-def _quick_trilinear_g2g(d0, b, f):
-    # Faster implementation of trilinear interpolation than available in scipy.
-
-    # sort axes so that shortest one is first
-    # this has performance gains when one axis is very small
-    order = np.argsort([v.size for v in b])
-    unsort = np.empty_like(order)
-    unsort[order] = np.arange(3)
-    sz = d0.shape
-    d0 = np.transpose(d0, axes=(order[0], order[1], order[2]) + sz[3:])
-    b = (b[order[0]], b[order[1]], b[order[2]])
-    f = (f[order[0]], f[order[1]], f[order[2]])
-
-    c = _trilinear_g2g(d0, b, f)
-
-    # put back in order
-    c = np.transpose(c, axes=(unsort[0], unsort[1], unsort[2]) + sz[3:])
-    return c
-
-
-def _trilinear_g2g(d0, b, f):
-    # perform trilinear interp from one grid to another
-
-    def clip_data(d0, b):
-        bx, by, bz = b
-        # just get the grid points I need
-        d0 = d0[bx[0] : (bx[-1] + 2), by[0] : (by[-1] + 2), bz[0] : (bz[-1] + 2), ...]
-        bx = bx - bx[0]
-        by = by - by[0]
-        bz = bz - bz[0]
-        b = (bx, by, bz)
-        return d0, b
-
-    d0, b = clip_data(d0, b)
-
-    bx, by, bz = b
-    fx, fy, fz = f
-    dx, dy, dz, _ = np.meshgrid(fx, fy, fz, [1], indexing="ij", sparse=True)
-
-    if len(d0.shape) == 3:
-        d0 = d0[:, :, :, np.newaxis]
-
-    c00 = d0[bx, :-1, :-1, ...] * (1 - dx) + d0[bx + 1, :-1, :-1, ...] * dx
-    c01 = d0[bx, :-1, 1:, ...] * (1 - dx) + d0[bx + 1, :-1, 1:, ...] * dx
-    c10 = d0[bx, 1:, :-1, ...] * (1 - dx) + d0[bx + 1, 1:, :-1, ...] * dx
-    c11 = d0[bx, 1:, 1:, ...] * (1 - dx) + d0[bx + 1, 1:, 1:, ...] * dx
-    c0 = c00[:, by, :, ...] * (1 - dy) + c10[:, by, :, ...] * dy
-    c1 = c01[:, by, :, ...] * (1 - dy) + c11[:, by, :, ...] * dy
-    c = c0[:, :, bz, ...] * (1 - dz) + c1[:, :, bz, ...] * dz
-
-    if c.shape[3] == 1:
-        c = np.squeeze(c, axis=3)
-
-    return c
-
-
-def _fraction(x, axis=None):
-    fx = np.interp(x.astype(float), axis.astype(float), np.arange(axis.size))
-    return fx
-
-
-def _base_fraction(x, axis=None):
-    fx = _fraction(x, axis=axis)
-    bx = fx.astype(int)
-    fx = fx - bx
-    return bx, fx
 
 
 def slice_sections(Ntotal, Nsections):
@@ -156,63 +57,388 @@ def slice_sections(Ntotal, Nsections):
     return tuple(slices)
 
 
-# def bin_2d(x0,y0,v0,Nx,Ny):
-#     x_slices = _slice_sections(x0.size,Nx)
-#     y_slices = _slice_sections(y0.size,Ny)
-#     x = np.array([x0[sl].mean() for sl in x_slices])
-#     y = np.array([y0[sl].mean() for sl in y_slices])
-#     v = np.empty_like(v0,shape=(y.size,x.size))
-#     for ix,slx in enumerate(x_slices):
-#         for iy,sly in enumerate(y_slices):
-#             v[iy,ix] = v0[sly,slx].mean()
-#     return x,y,v
-#
-# def bin_3d(x0,y0,z0,v0,Nx,Ny,Nz):
-#     x_slices = _slice_sections(x0.size,Nx)
-#     y_slices = _slice_sections(y0.size,Ny)
-#     z_slices = _slice_sections(z0.size,Nz)
-#     x = np.array([x0[sl].mean() for sl in x_slices])
-#     y = np.array([y0[sl].mean() for sl in y_slices])
-#     z = np.array([z0[sl].mean() for sl in z_slices])
-#     v = np.empty_like(v0,shape=(z.size,y.size,x.size))
-#     for ix,slx in enumerate(x_slices):
-#         for iy,sly in enumerate(y_slices):
-#             for iz,slz in enumerate(z_slices):
-#                 v[iz,iy,ix] = v0[sly,slx].mean()
-#     return x,y,z,v
+# FUNCTIONS FOR EFFICIENT LINEAR INTERPOLATION
 
 
-def interp_g2g_bilinear(x0, y0, v0, x, y):
-    """bilinear interpolation from one grid to another"""
-    bx, fx = _base_fraction(x, axis=x0)
-    by, fy = _base_fraction(y, axis=y0)
-    return _bilinear_g2g(v0, (bx, by), (fx, fy))
-
-
-def interp_g2g_trilinear(x0, y0, z0, v0, x, y, z):
-    """trilinear interpolation from one grid to another"""
-    # bounds are not checked.
-    # weird behavior expected if target grid exceed bounds of the source grid...
-    bx, fx = _base_fraction(x, axis=x0)
-    by, fy = _base_fraction(y, axis=y0)
-    bz, fz = _base_fraction(z, axis=z0)
-    return _quick_trilinear_g2g(v0, (bx, by, bz), (fx, fy, fz))
+@jit
+def histogram(data, bin_edges):
+    counts = np.zeros(len(bin_edges) - 1, dtype=np.int64)
+    for value in data:
+        for i in range(len(bin_edges) - 1):
+            if bin_edges[i] <= value < bin_edges[i + 1]:
+                counts[i] += 1
+                break
+        else:
+            if value == bin_edges[-1]:
+                counts[-1] += 1
+    return counts
 
 
 def interp3(x0, y0, z0, v0, x, y, z, order=1):
     """interpolate from data on a 3D grid to a set of points"""
-    # faster version of scipy.interpolate.interpn using map_coordinates
-    fx = _fraction(x, axis=x0)
-    fy = _fraction(y, axis=y0)
-    fz = _fraction(z, axis=z0)
-    coordinates = np.stack((fx, fy, fz))
-    return map_coordinates(v0, coordinates, order=order)
+    if order != 1:
+        raise ValueError("Only order=1 (linear interpolation) is supported with numba")
+    # Cast all inputs to float64
+    x0 = np.asarray(x0, dtype=np.float64)
+    y0 = np.asarray(y0, dtype=np.float64)
+    z0 = np.asarray(z0, dtype=np.float64)
+    v0 = np.asarray(v0, dtype=np.float64)
+    x = np.asarray(x, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    z = np.asarray(z, dtype=np.float64)
+    return _interp3(x0, y0, z0, v0, x, y, z)
 
 
 def interp2(x0, y0, v0, x, y, order=1):
     """interpolate from data on a 2D grid to a set of points"""
-    # faster version of scipy.interpolate.interpn using map_coordinates
+    if order != 1:
+        raise ValueError("Only order=1 (linear interpolation) is supported with numba")
+    # Cast all inputs to float64
+    x0 = np.asarray(x0, dtype=np.float64)
+    y0 = np.asarray(y0, dtype=np.float64)
+    v0 = np.asarray(v0, dtype=np.float64)
+    x = np.asarray(x, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    return _interp2(x0, y0, v0, x, y)
+
+
+def interp_g2g_trilinear(x0, y0, z0, v0, x, y, z):
+    """
+    Trilinear interpolation from one 3D grid to another.
+
+    All inputs are automatically cast to float64 arrays.
+
+    Parameters
+    ----------
+    x0, y0, z0 : array_like
+        Source grid axes
+    v0 : array_like
+        Source data (3D or 4D)
+    x, y, z : array_like
+        Target grid axes
+
+    Returns
+    -------
+    result : ndarray
+        Interpolated data on target grid
+    """
+    # Cast all inputs to float64
+    x0 = np.asarray(x0, dtype=np.float64)
+    y0 = np.asarray(y0, dtype=np.float64)
+    z0 = np.asarray(z0, dtype=np.float64)
+    v0 = np.asarray(v0, dtype=np.float64)
+    x = np.asarray(x, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    z = np.asarray(z, dtype=np.float64)
+
+    if v0.ndim == 3:
+        return _trilinear_g2g_3d(x0, y0, z0, v0, x, y, z)
+    elif v0.ndim == 4:
+        return _trilinear_g2g_4d(x0, y0, z0, v0, x, y, z)
+    else:
+        raise ValueError(f"v0 must be 3D or 4D, got shape {v0.shape}")
+
+
+def interp_g2g_bilinear(x0, y0, v0, x, y):
+    """
+    Bilinear interpolation from one 2D grid to another.
+
+    All inputs are automatically cast to float64 arrays.
+
+    Parameters
+    ----------
+    x0, y0 : array_like
+        Source grid axes
+    v0 : array_like
+        Source data (2D or 3D)
+    x, y : array_like
+        Target grid axes
+
+    Returns
+    -------
+    result : ndarray
+        Interpolated data on target grid
+    """
+    # Cast all inputs to float64
+    x0 = np.asarray(x0, dtype=np.float64)
+    y0 = np.asarray(y0, dtype=np.float64)
+    v0 = np.asarray(v0, dtype=np.float64)
+    x = np.asarray(x, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+
+    if v0.ndim == 2:
+        return _bilinear_g2g_2d(x0, y0, v0, x, y)
+    elif v0.ndim == 3:
+        return _bilinear_g2g_3d(x0, y0, v0, x, y)
+    else:
+        raise ValueError(f"v0 must be 2D or 3D, got shape {v0.shape}")
+
+
+@jit
+def _base_fraction(x, axis=None):
+    """
+    Map points x onto axis indices using binary search with extrapolation.
+    Points outside the axis range will have negative or > (axis.size-1) values.
+    """
+    n = x.size
+    fx = np.empty(n, dtype=np.float64)
+    bx = np.empty(n, dtype=np.int32)
+
+    for i in range(n):
+        val = x[i]
+
+        # Handle extrapolation below lower bound
+        if val <= axis[0]:
+            left = 0
+            right = 1
+        # Handle extrapolation above upper bound
+        elif val >= axis[-1]:
+            left = axis.size - 2
+            right = axis.size - 1
+        else:
+            # Binary search for the correct interval (within bounds)
+            left = 0
+            right = axis.size - 1
+
+            while right - left > 1:
+                mid = (left + right) // 2
+                if axis[mid] <= val:
+                    left = mid
+                else:
+                    right = mid
+
+        # Linear interpolation (or extrapolation) within the interval
+        dx = (val - axis[left]) / (axis[right] - axis[left])
+        fx[i] = dx
+        bx[i] = left
+
+    return bx, fx
+
+
+@jit
+def _fraction(x, axis=None):
+    b, f = _base_fraction(x, axis=axis)
+    return b + f
+
+
+@jit
+def _map_coordinates_linear_2d(v0, fx, fy):
+    """
+    Numba-compatible implementation of map_coordinates for 2D arrays with linear interpolation.
+
+    Parameters:
+    -----------
+    v0 : 2D array
+        Input data
+    fx, fy : 1D arrays
+        Fractional indices for each dimension
+
+    Returns:
+    --------
+    1D array of interpolated values
+    """
+    n = fx.size
+    result = np.empty(n)
+
+    for i in range(n):
+        # Get integer and fractional parts
+        ix = int(np.floor(fx[i]))
+        iy = int(np.floor(fy[i]))
+
+        # Clip to valid range
+        ix = max(0, min(ix, v0.shape[0] - 2))
+        iy = max(0, min(iy, v0.shape[1] - 2))
+
+        dx = fx[i] - ix
+        dy = fy[i] - iy
+
+        # Bilinear interpolation
+        c0 = v0[ix, iy] * (1 - dx) + v0[ix + 1, iy] * dx
+        c1 = v0[ix, iy + 1] * (1 - dx) + v0[ix + 1, iy + 1] * dx
+
+        result[i] = c0 * (1 - dy) + c1 * dy
+
+    return result
+
+
+@jit
+def _map_coordinates_linear_3d(v0, fx, fy, fz):
+    """
+    Numba-compatible implementation of map_coordinates for 3D arrays with linear interpolation.
+
+    Parameters:
+    -----------
+    v0 : 3D array
+        Input data
+    fx, fy, fz : 1D arrays
+        Fractional indices for each dimension
+
+    Returns:
+    --------
+    1D array of interpolated values
+    """
+    n = fx.size
+    result = np.empty(n)
+
+    for i in range(n):
+        # Get integer and fractional parts
+        ix = int(np.floor(fx[i]))
+        iy = int(np.floor(fy[i]))
+        iz = int(np.floor(fz[i]))
+
+        # Clip to valid range
+        ix = max(0, min(ix, v0.shape[0] - 2))
+        iy = max(0, min(iy, v0.shape[1] - 2))
+        iz = max(0, min(iz, v0.shape[2] - 2))
+
+        dx = fx[i] - ix
+        dy = fy[i] - iy
+        dz = fz[i] - iz
+
+        # Trilinear interpolation
+        c00 = v0[ix, iy, iz] * (1 - dx) + v0[ix + 1, iy, iz] * dx
+        c01 = v0[ix, iy, iz + 1] * (1 - dx) + v0[ix + 1, iy, iz + 1] * dx
+        c10 = v0[ix, iy + 1, iz] * (1 - dx) + v0[ix + 1, iy + 1, iz] * dx
+        c11 = v0[ix, iy + 1, iz + 1] * (1 - dx) + v0[ix + 1, iy + 1, iz + 1] * dx
+
+        c0 = c00 * (1 - dy) + c10 * dy
+        c1 = c01 * (1 - dy) + c11 * dy
+
+        result[i] = c0 * (1 - dz) + c1 * dz
+
+    return result
+
+
+@jit(
+    float64[:](float64[:], float64[:], float64[:], float64[:, :, :], float64[:], float64[:], float64[:]),
+    nopython=True,
+    cache=True,
+)
+def _interp3(x0, y0, z0, v0, x, y, z):
+    """interpolate from data on a 3D grid to a set of points"""
     fx = _fraction(x, axis=x0)
     fy = _fraction(y, axis=y0)
-    coordinates = np.stack((fx, fy))
-    return map_coordinates(v0, coordinates, order=order)
+    fz = _fraction(z, axis=z0)
+    return _map_coordinates_linear_3d(v0, fx, fy, fz)
+
+
+@jit(
+    float64[:](float64[:], float64[:], float64[:, :], float64[:], float64[:]),
+    nopython=True,
+    cache=True,
+)
+def _interp2(x0, y0, v0, x, y):
+    """interpolate from data on a 2D grid to a set of points"""
+    fx = _fraction(x, axis=x0)
+    fy = _fraction(y, axis=y0)
+    return _map_coordinates_linear_2d(v0, fx, fy)
+
+
+@jit(
+    float64[:, :](float64[:], float64[:], float64[:, :], float64[:], float64[:]),
+    nopython=True,
+    cache=True,
+)
+def _bilinear_g2g_2d(x0, y0, d0, x, y):
+    bx, fx = _base_fraction(x, axis=x0)
+    by, fy = _base_fraction(y, axis=y0)
+
+    # Clip the data
+    d0 = d0[bx[0] : (bx[-1] + 2), by[0] : (by[-1] + 2)]
+    bx = bx - bx[0]
+    by = by - by[0]
+
+    dx = fx[:, None]
+    dy = fy[None, :]
+
+    c0 = d0[bx, :-1] * (1 - dx) + d0[bx + 1, :-1] * dx
+    c1 = d0[bx, 1:] * (1 - dx) + d0[bx + 1, 1:] * dx
+    c = c0[:, by] * (1 - dy) + c1[:, by] * dy
+
+    return c
+
+
+@jit(
+    float64[:, :, :](float64[:], float64[:], float64[:, :, :], float64[:], float64[:]),
+    nopython=True,
+    cache=True,
+)
+def _bilinear_g2g_3d(x0, y0, d0, x, y):
+    bx, fx = _base_fraction(x, axis=x0)
+    by, fy = _base_fraction(y, axis=y0)
+
+    # Clip the data
+    d0 = d0[bx[0] : (bx[-1] + 2), by[0] : (by[-1] + 2), :]
+    bx = bx - bx[0]
+    by = by - by[0]
+
+    dx = fx[:, None, None]
+    dy = fy[None, :, None]
+
+    c0 = d0[bx, :-1, :] * (1 - dx) + d0[bx + 1, :-1, :] * dx
+    c1 = d0[bx, 1:, :] * (1 - dx) + d0[bx + 1, 1:, :] * dx
+    c = c0[:, by, :] * (1 - dy) + c1[:, by, :] * dy
+
+    return c
+
+
+@jit(
+    float64[:, :, :](float64[:], float64[:], float64[:], float64[:, :, :], float64[:], float64[:], float64[:]),
+    nopython=True,
+    cache=True,
+)
+def _trilinear_g2g_3d(x0, y0, z0, d0, x, y, z):
+    bx, fx = _base_fraction(x, axis=x0)
+    by, fy = _base_fraction(y, axis=y0)
+    bz, fz = _base_fraction(z, axis=z0)
+
+    # Clip the data
+    d0 = d0[bx[0] : (bx[-1] + 2), by[0] : (by[-1] + 2), bz[0] : (bz[-1] + 2)]
+    bx = bx - bx[0]
+    by = by - by[0]
+    bz = bz - bz[0]
+
+    dx = fx[:, None, None]
+    dy = fy[None, :, None]
+    dz = fz[None, None, :]
+
+    c00 = d0[bx, :-1, :-1] * (1 - dx) + d0[bx + 1, :-1, :-1] * dx
+    c01 = d0[bx, :-1, 1:] * (1 - dx) + d0[bx + 1, :-1, 1:] * dx
+    c10 = d0[bx, 1:, :-1] * (1 - dx) + d0[bx + 1, 1:, :-1] * dx
+    c11 = d0[bx, 1:, 1:] * (1 - dx) + d0[bx + 1, 1:, 1:] * dx
+    c0 = c00[:, by, :] * (1 - dy) + c10[:, by, :] * dy
+    c1 = c01[:, by, :] * (1 - dy) + c11[:, by, :] * dy
+    c = c0[:, :, bz] * (1 - dz) + c1[:, :, bz] * dz
+
+    return c
+
+
+@jit(
+    float64[:, :, :, :](float64[:], float64[:], float64[:], float64[:, :, :, :], float64[:], float64[:], float64[:]),
+    nopython=True,
+    cache=True,
+)
+def _trilinear_g2g_4d(x0, y0, z0, d0, x, y, z):
+    bx, fx = _base_fraction(x, axis=x0)
+    by, fy = _base_fraction(y, axis=y0)
+    bz, fz = _base_fraction(z, axis=z0)
+
+    # Clip the data
+    d0 = d0[bx[0] : (bx[-1] + 2), by[0] : (by[-1] + 2), bz[0] : (bz[-1] + 2), :]
+    bx = bx - bx[0]
+    by = by - by[0]
+    bz = bz - bz[0]
+
+    dx = fx[:, None, None, None]
+    dy = fy[None, :, None, None]
+    dz = fz[None, None, :, None]
+
+    c00 = d0[bx, :-1, :-1, :] * (1 - dx) + d0[bx + 1, :-1, :-1, :] * dx
+    c01 = d0[bx, :-1, 1:, :] * (1 - dx) + d0[bx + 1, :-1, 1:, :] * dx
+    c10 = d0[bx, 1:, :-1, :] * (1 - dx) + d0[bx + 1, 1:, :-1, :] * dx
+    c11 = d0[bx, 1:, 1:, :] * (1 - dx) + d0[bx + 1, 1:, 1:, :] * dx
+    c0 = c00[:, by, :, :] * (1 - dy) + c10[:, by, :, :] * dy
+    c1 = c01[:, by, :, :] * (1 - dy) + c11[:, by, :, :] * dy
+    c = c0[:, :, bz, :] * (1 - dz) + c1[:, :, bz, :] * dz
+
+    return c
