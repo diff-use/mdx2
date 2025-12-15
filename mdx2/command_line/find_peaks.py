@@ -3,6 +3,7 @@ Find and analyze peaks in an image stack
 """
 
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 from joblib import Parallel, delayed
@@ -13,6 +14,7 @@ from mdx2.command_line import log_parallel_backend, make_argument_parser, with_l
 from mdx2.data import Peaks
 from mdx2.geometry import GaussianPeak
 from mdx2.io import loadobj, saveobj
+from mdx2.stats import find_peaks
 
 
 @dataclass
@@ -21,7 +23,7 @@ class Parameters:
 
     geom: str = field(positional=True)  # NeXus data file containing miller_index
     data: str = field(positional=True)  # NeXus data file containing image_series
-    count_threshold: float  # pixels with counts above threshold are flagged as peaks
+    count_threshold: Optional[float] = None  # pixels with counts above threshold are flagged as peaks
     sigma_cutoff: float = 3.0  # for outlier rejection in Gaussian peak fitting
     outfile: str = "peaks.nxs"  # name of the output NeXus file
     nproc: int = 1  # number of parallel processes (or 1 for sequential, -1 for all CPUs, -N for all but N+1)
@@ -40,6 +42,7 @@ def run_find_peaks(params):
     sigma_cutoff = params.sigma_cutoff
     outfile = params.outfile
     nproc = params.nproc
+    p_value = 1e-6  # NOTE: does this need to be a CLI option?
 
     logger.info("Loading geometry and image data...")
     MI = loadobj(geom, "miller_index")
@@ -47,11 +50,23 @@ def run_find_peaks(params):
 
     logger.info("Finding pixels above threshold: {}", count_threshold)
 
+    if count_threshold is not None:
+        logger.info("Finding pixels above threshold: {}", count_threshold)
+    else:
+        logger.info("Estimating count thresholds dynamically for each data chunk")
+
+    # Pre-compile JIT functions before forking if using multiprocessing
+    if count_threshold is None and nproc > 1:
+        dummy_data = np.array([0, 1, 2, 3, 4, 5], dtype=IS.data.dtype)
+        # Trigger JIT compilation
+        _ = find_peaks(dummy_data, threshold=count_threshold, p_value=p_value, bin_size=None)
+        logger.info("Pre-compiled find_peaks JIT functions for multiprocessing")
+
     # Find peaks in parallel
     def peaksearch(sl):
         ims = IS[sl]
-        im_data = ims.data_masked
-        peaks = Peaks.where(im_data > count_threshold, ims.phi, ims.iy, ims.ix)
+        peak_mask = find_peaks(ims.data, threshold=count_threshold, p_value=p_value, bin_size=None)
+        peaks = Peaks.where(peak_mask, ims.phi, ims.iy, ims.ix)
         if peaks.size:
             return peaks
 
@@ -64,9 +79,15 @@ def run_find_peaks(params):
 
     peaks_nonempty = [p for p in peaklist if p is not None]
     if not peaks_nonempty:
-        raise ValueError(
-            f"No peaks found above threshold {count_threshold}. Try lowering the threshold or check your data."
-        )
+        if count_threshold is not None:
+            raise ValueError(
+                f"No peaks found above threshold {count_threshold}. Try lowering the threshold or check your data."
+            )
+        else:
+            raise ValueError(
+                "No peaks found using dynamic threshold. Try setting a manual threshold or checking your data."
+            )
+
     P = Peaks.stack(peaks_nonempty)
     logger.info("Found {} peak pixels", P.size)
 
