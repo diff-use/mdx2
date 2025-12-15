@@ -2,6 +2,7 @@ import os
 from copy import deepcopy
 
 import h5py
+import hdf5plugin
 import numpy as np
 import pandas as pd
 from nexusformat.nexus import NXdata, NXfield, NXgroup, NXreflections, NXvirtualfield
@@ -632,7 +633,7 @@ class ImageSeries:
 
     @staticmethod
     def from_expt(exptfile):
-        data_opts = {"dtype": np.int32, "compression": "gzip", "compression_opts": 1, "shuffle": True}
+        data_opts = {"dtype": np.int32, "compression": hdf5plugin.LZ4(), "shuffle": True}
         expt = Experiment.from_file(exptfile)
         phi, iy, ix = expt.scan_axes
         shape = (phi.size, iy.size, ix.size)
