@@ -339,6 +339,8 @@ class ImageSet:
         nx, ny = det.get_image_size()
         return (ny, nx)
 
+    dtype = np.int32  # assume 32-bit integer data
+
     def read_frame(self, ind, maskval=-1):
         # for now, apply mask by default and return just the image as an ndarray
         im = self._iset.get_raw_data(ind)[0]
@@ -349,6 +351,8 @@ class ImageSet:
             image = im.as_numpy_array()
         else:
             image = np.ma.masked_array(im.as_numpy_array(), mask=msk.as_numpy_array())
+        if image.dtype != self.dtype:
+            raise ValueError(f"unexpected data type: {image.dtype}, expected {self.dtype}")
         return image
 
     def read_stack(self, start, stop):
