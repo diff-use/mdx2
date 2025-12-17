@@ -319,6 +319,8 @@ class Experiment:
 class ImageSet:
     """Wrapper for dxtbx imageset object"""
 
+    maskval = -1
+
     def __init__(self, iset):
         self._iset = iset
 
@@ -341,16 +343,13 @@ class ImageSet:
 
     dtype = np.int32  # assume 32-bit integer data
 
-    def read_frame(self, ind, maskval=-1):
+    def read_frame(self, ind):
         # for now, apply mask by default and return just the image as an ndarray
         im = self._iset.get_raw_data(ind)[0]
         msk = self._iset.get_mask(ind)[0]
         msk = ~msk
-        if maskval is not None:
-            im.set_selected(msk, maskval)  # flex array magic
-            image = im.as_numpy_array()
-        else:
-            image = np.ma.masked_array(im.as_numpy_array(), mask=msk.as_numpy_array())
+        im.set_selected(msk, self.maskval)  # flex array magic
+        image = im.as_numpy_array()
         if image.dtype != self.dtype:
             raise ValueError(f"unexpected data type: {image.dtype}, expected {self.dtype}")
         return image
