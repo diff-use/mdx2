@@ -10,7 +10,7 @@ from loguru import logger
 from simple_parsing import field
 
 from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging, with_parsing
-from mdx2.data import ImageSeries
+from mdx2.data import LazyImageSeries, VirtualImageSeries
 from mdx2.dxtbx_machinery import ImageSet
 from mdx2.io import nxload
 
@@ -36,7 +36,7 @@ def run_import_data(params):
     datastore = params.datastore
 
     logger.info("Loading experiment metadata...")
-    image_series = ImageSeries.from_expt(exptfile)
+    image_series = LazyImageSeries.from_expt(exptfile)
     iset = ImageSet.from_file(exptfile)
     logger.info("Image data shape (phi, iy, ix): {}", image_series.shape)
 
@@ -49,9 +49,9 @@ def run_import_data(params):
         logger.info("Using chunking: {}", chunks)
 
     logger.info("Creating virtual dataset structure...")
-    image_series.save(
+    virtual_image_series = VirtualImageSeries.create(
+        image_series,
         outfile,
-        virtual=True,
         source_directory=datastore,
     )
 
@@ -60,24 +60,18 @@ def run_import_data(params):
         data = iset.read_stack(istart, istop)
         source[:, :, :] = data
 
-    slices = [sl for sl in image_series.chunk_slice_along_axis(0)]
+    slices = [sl for sl in virtual_image_series.chunk_slice_along_axis(0)]
 
     # Access virtual dataset information through public API
     # Reload the ImageSeries to ensure we have the updated virtual dataset
-    image_series_reloaded = ImageSeries.load(outfile)
-    files = image_series_reloaded.virtual_source_files
-    vpath = image_series_reloaded.virtual_dataset_path
+    files = virtual_image_series.virtual_source_files
+    vpath = virtual_image_series.virtual_dataset_path
 
     # These edge cases should not happen if virtual datasets are implemented correctly, but check anyway
     if len(files) != len(slices):
         raise RuntimeError(f"Virtual dataset mismatch: {len(slices)=} vs {len(files)=}")
     if len(set(files)) != len(files):
         raise RuntimeError("Virtual_source_files contains duplicates, cannot proceed with import.")
-
-    # Properties will raise RuntimeError if internal API has changed
-    # If data is not a virtual dataset, they return None
-    if files is None or vpath is None:
-        raise RuntimeError(f"Expected virtual dataset in {outfile}, but virtual dataset information is not available.")
 
     logger.info("Writing {} image batches (requested n_jobs: {})...", len(slices), nproc)
     with Parallel(n_jobs=nproc, verbose=10) as parallel:
