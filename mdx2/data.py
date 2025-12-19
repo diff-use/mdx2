@@ -5,7 +5,6 @@ from copy import deepcopy
 
 import h5py
 import hdf5plugin
-import numexpr as ne
 import numpy as np
 import pandas as pd
 from nexusformat.nexus import NXdata, NXfield, NXgroup, NXreflections, NXvirtualfield
@@ -589,7 +588,7 @@ class DenseImageSeries(_ImageSeriesBase):
             # - If LazyImageSeries.load is called on a VirtualImageSeries object, the chunks attribute will not work.
             # - [...] < - if more are found, insert here.
             #
-            # The best solution, I think, would be to implement a load method for each subclass that handles special cases.
+            # The best solution (?) would be to implement a load method for each subclass that handles special cases.
             cls_obj = globals().get(class_name, None)
             if cls_obj is None or not issubclass(cls_obj, DenseImageSeries):
                 raise ValueError(f"object {name} in file {filename} is not a subclass of DenseImageSeries")
