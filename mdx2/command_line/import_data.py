@@ -14,7 +14,7 @@ from mdx2.command_line import log_parallel_backend, make_argument_parser, with_l
 from mdx2.data import LazyImageSeries, SparseImageSeries, VirtualImageSeries
 from mdx2.dxtbx_machinery import ImageSet
 from mdx2.io import nxload, saveobj
-from mdx2.stats import find_peaks
+from mdx2.processing import find_peaks
 
 
 @dataclass
