@@ -5,6 +5,7 @@ from copy import deepcopy
 
 import h5py
 import hdf5plugin
+import numexpr as ne
 import numpy as np
 import pandas as pd
 from nexusformat.nexus import NXdata, NXfield, NXgroup, NXreflections, NXvirtualfield
@@ -511,13 +512,8 @@ class SparseImageSeries(_ImageSeriesBase):
 
     @classmethod
     def from_nexus(cls, nxdata):
-        phi = nxdata.phi.nxvalue
-        iy = nxdata.iy.nxvalue
-        ix = nxdata.ix.nxvalue
-        exposure_times = nxdata.exposure_times.nxvalue
-        indices = nxdata.indices.nxvalue
-        values = nxdata.values.nxvalue
-        return cls(phi, iy, ix, indices, values, exposure_times)
+        args = [nxdata[k].nxvalue for k in ["phi", "iy", "ix", "indices", "values", "exposure_times"]]
+        return cls(*args)
 
     def to_nexus(self):
         nxobj = NXgroup(name="image_series", **self.__dict__)
@@ -525,10 +521,10 @@ class SparseImageSeries(_ImageSeriesBase):
         return nxobj
 
     def index(self, miller_index):
-        phi = self.phi[self.index[:, 0]]
-        iy = self.iy[self.index[:, 1]]
-        ix = self.iy[self.index[:, 2]]
-        exposure_times = self.exposure_times[self.index[:, 0]]
+        phi = self.phi[self.indices[:, 0]]
+        iy = self.iy[self.indices[:, 1]]
+        ix = self.iy[self.indices[:, 2]]
+        exposure_times = self.exposure_times[self.indices[:, 0]]
         h, k, l = miller_index.interpolate(phi, iy, ix)
 
         return HKLTable(h, k, l, phi=phi, iy=iy, ix=ix, counts=self.values, seconds=exposure_times)
@@ -589,6 +585,11 @@ class DenseImageSeries(_ImageSeriesBase):
             if class_name != cls.__name__:
                 raise ValueError(f"object {name} in file {filename} is not an mdx2.data.{cls.__name__}")
         else:
+            # NOTE: there is some potential for bugs here.
+            # - If LazyImageSeries.load is called on a VirtualImageSeries object, the chunks attribute will not work.
+            # - [...] < - if more are found, insert here.
+            #
+            # The best solution, I think, would be to implement a load method for each subclass that handles special cases.
             cls_obj = globals().get(class_name, None)
             if cls_obj is None or not issubclass(cls_obj, DenseImageSeries):
                 raise ValueError(f"object {name} in file {filename} is not a subclass of DenseImageSeries")

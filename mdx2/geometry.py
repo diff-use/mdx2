@@ -42,6 +42,44 @@ class GaussianPeak:
         d = np.linalg.inv(self.sigma) @ (r - self.r0[:, np.newaxis])
         return np.sum(d * d, axis=0).reshape(x.shape)
 
+    def quadform_expression(self, x="x", y="y", z="z"):
+        """Return an expression (to be evaluated by numexpr) that works like quadform_at_points"""
+        # old version using eigen decomposition... was overkill
+        # U, s, Vt = np.linalg.svd(self.sigma)
+        # V = U @ np.diag(1 / s)
+
+        # new version, just take the inverse (V below is the transpose of V as defined above using SVD)
+        V = np.linalg.inv(self.sigma)
+
+        Vr0 = V @ self.r0
+
+        # now the calculation looks like: a^2 + b^2 + c^2
+        a_expr = "{v_00}*{x} + {v_01}*{y} + {v_02}*{z} - {vr0_0}"
+        b_expr = "{v_10}*{x} + {v_11}*{y} + {v_12}*{z} - {vr0_1}"
+        c_expr = "{v_20}*{x} + {v_21}*{y} + {v_22}*{z} - {vr0_2}"
+        quadform_expr = f"({a_expr})**2 + ({b_expr})**2 + ({c_expr})**2"
+
+        # substitute in the numerical values for the coefficients
+        coeffs = {
+            "x": x,
+            "y": y,
+            "z": z,
+            "v_00": V[0, 0],
+            "v_10": V[1, 0],
+            "v_20": V[2, 0],
+            "v_01": V[0, 1],
+            "v_11": V[1, 1],
+            "v_21": V[2, 1],
+            "v_02": V[0, 2],
+            "v_12": V[1, 2],
+            "v_22": V[2, 2],
+            "vr0_0": Vr0[0],
+            "vr0_1": Vr0[1],
+            "vr0_2": Vr0[2],
+        }
+
+        return quadform_expr.format(**coeffs)
+
     def mask(self, x, y, z, sigma_cutoff=1):
         # assume x,y,z are all the same shape
         d2 = self.quadform_at_points(x, y, z)
@@ -53,6 +91,116 @@ class GaussianPeak:
 
     def to_nexus(self):
         return NXgroup(name="gaussian_peak", sigma=self.sigma, r0=self.r0)
+
+
+class DynamicMask:
+    """Base class for dynamic masks"""
+
+    def __init__(self, expr, *varnames):
+        """expr is a boolean expression that can be run using ne.evaluate"""
+        self._expr = expr
+        self._varnames = set(varnames)
+
+    def evaluate(self, **kwargs):
+        # first, check that all required variables are provided
+        for var in self._varnames:
+            if var not in kwargs:
+                raise ValueError(f"Missing required variable: {var}")
+        return ne.evaluate(self._expr, local_dict=kwargs)
+
+    def __and__(self, other):
+        """for composing expressions
+
+        no input checking is performed, use with care"""
+        if not isinstance(other, DynamicMask):
+            raise ValueError(f"Cannot combine DynamicMask with {type(other)}")
+
+        new_expr = f"({self._expr}) & ({other._expr})"
+        return DynamicMask(new_expr, *self._varnames.union(other._varnames))
+
+    def __or__(self, other):
+        """for composing expressions
+
+        no input checking is performed, use with care"""
+        if not isinstance(other, DynamicMask):
+            raise ValueError(f"Cannot combine DynamicMask with {type(other)}")
+
+        new_expr = f"({self._expr}) | ({other._expr})"
+        return DynamicMask(new_expr, *self._varnames.union(other._varnames))
+
+    def __invert__(self):
+        """for composing expressions
+
+        no input checking is performed, use with care"""
+        new_expr = f"~({self._expr})"
+        return DynamicMask(new_expr, *self._varnames)
+
+    def __repr__(self):
+        return self._expr
+
+    def to_nexus(self):
+        return NXgroup(
+            name="mask",
+            expr=self._expr,
+        )
+
+    @classmethod
+    def from_nexus(cls, nxobj):
+        maskobj = cls.__new__(cls)
+        maskobj._expr = nxobj.expr.nxvalue
+        return maskobj
+
+
+class GaussianPeakMask(DynamicMask):
+    """Dynamically evaluated Gaussian peak mask"""
+
+    def __init__(self, r0, sigma, contour_level):
+        """
+        The region withing the peak (qform < contour^2) is masked out
+        """
+        peak_model = GaussianPeak(r0, sigma)
+        qexpr = peak_model.quadform_expression(x="(h - round(h))", y="(k - round(k))", z="(l - round(l))")
+        cl2 = float(contour_level) ** 2
+        expr = f"{cl2} > ({qexpr})"
+        super().__init__(expr, "h", "k", "l")
+
+
+class ResolutionMask(DynamicMask):
+    """Dynamically evaluated resolution mask"""
+
+    def __init__(self, ub_matrix, d):
+        """
+        d is the resolution cutoff (s = 1/d)
+        data beyond 1/d is masked out ( = True)
+        """
+        qexpr = self._quadform_expression(ub_matrix)
+        s2 = 1.0 / float(d) ** 2
+        expr = f"{s2} < ({qexpr})"
+        super().__init__(expr, "h", "k", "l")
+
+    def _quadform_expression(self, V):
+        a_expr = "{v_00}*{x} + {v_01}*{y} + {v_02}*{z}"
+        b_expr = "{v_10}*{x} + {v_11}*{y} + {v_12}*{z}"
+        c_expr = "{v_20}*{x} + {v_21}*{y} + {v_22}*{z}"
+        expr = f"sqrt(({a_expr})**2 + ({b_expr})**2 + ({c_expr})**2)"
+
+        # substitute in the numerical values for the coefficients
+        coeffs = {
+            "x": "h",
+            "y": "k",
+            "z": "l",
+            "v_00": V[0, 0],
+            "v_10": V[1, 0],
+            "v_20": V[2, 0],
+            "v_01": V[0, 1],
+            "v_11": V[1, 1],
+            "v_21": V[2, 1],
+            "v_02": V[0, 2],
+            "v_12": V[1, 2],
+            "v_22": V[2, 2],
+        }
+
+        return expr.format(**coeffs)
 
 
 class GridData:

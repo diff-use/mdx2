@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from mdx2.stats import _histogram
+from mdx2.processing import _histogram
 
 
 class TestHistogram:
