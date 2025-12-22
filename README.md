@@ -46,9 +46,9 @@ For a conda-based installation, you'll need [micromamba](https://mamba.readthedo
 ### User install (conda environment)
 
 ```bash
-micromamba create -f https://raw.githubusercontent.com/diff-use/mdx2/main/env.yaml
+micromamba create -f https://raw.githubusercontent.com/ando-lab/mdx2/refs/tags/v1.0.3/env.yaml
 micromamba activate mdx2
-pip install git+https://github.com/diff-use/mdx2
+pip install mdx2==1.0.3
 ```
 
 You'll probably want these packages too:
@@ -57,14 +57,6 @@ You'll probably want these packages too:
 micromamba install -c conda-forge dials nexpy jupyterlab xia2
 ```
 
-### Developer install (conda environment)
+### Developer install
 
-```bash
-git clone https://github.com/diff-use/mdx2.git
-cd mdx2
-micromamba create -f env.yaml -n mdx2-dev
-micromamba activate mdx2-dev
-pip install -e ".[dev]"
-```
-
-The last line installs mdx2 in editable mode, with optional development tools including pytest and ruff
+See The Diffuse Project's [fork](https://github.com/diff-use/mdx2) for instructions.
