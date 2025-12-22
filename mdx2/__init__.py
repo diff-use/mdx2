@@ -1,7 +1,3 @@
-def getVersionNumber():
-    import pkg_resources
+from importlib.metadata import version
 
-    version = pkg_resources.require("mdx2")[0].version
-    return version
-
-__version__ = getVersionNumber()
+__version__ = version("mdx2")

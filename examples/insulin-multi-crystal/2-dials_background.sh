@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-DATADIR="/nfs/chess/scratch/user/spm82/data/insulin"
+DATADIR="/fs/cbsuandofs1/storage/archive/data/xray/chess_f1_2017_06/insulin"
 
 cd dials
 for sub in {1..2}_bkg; do

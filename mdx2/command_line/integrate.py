@@ -2,103 +2,110 @@
 Integrate counts in an image stack on a Miller index grid
 """
 
-import argparse
+from dataclasses import dataclass
+from typing import Optional, Tuple
 
 import numpy as np
-import pandas as pd
 from joblib import Parallel, delayed
-from nexusformat.nexus import nxload # mask is too big to read all at once?
+from loguru import logger
+from simple_parsing import field
 
-from mdx2.utils import saveobj, loadobj
-from mdx2.data import ImageSeries
+from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging, with_parsing
 from mdx2.data import HKLTable
+from mdx2.io import (
+    loadobj,
+    nxload,  # mask is too big to read all at once?
+    saveobj,
+)
 
-def parse_arguments():
-    """Parse commandline arguments"""
 
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
+@dataclass
+class Parameters:
+    """Options for integrating counts on a Miller index grid"""
 
-    # Required arguments
-    parser.add_argument("geom", help="NeXus file with miller_index")
-    parser.add_argument("data", help="NeXus file with image_series")
-    parser.add_argument("--mask", help="NeXus file with mask")
-    parser.add_argument("--subdivide", nargs=3, metavar='N', type=int, default=[1,1,1], help="subdivisions of the Miller index grid")
-    #parser.add_argument("--limits", nargs=6, metavar=('hmin,hmax,kmin,kmax,lmin,lmax'), type=float, help="included region")
-    parser.add_argument("--max_spread", type=float, default=1.0, metavar='DEGREES', help="maximum angular spread for binning partial observations")
-    parser.add_argument("--outfile", default="integrated.nxs", help="name of the output NeXus file")
-    parser.add_argument("--nproc", type=int, default=1, metavar='N', help="number of parallel processes")
+    geom: str = field(positional=True)  # NeXus data file containing miller_index
+    data: str = field(positional=True)  # NeXus data file containing image_series
+    mask: Optional[str] = None  # NeXus data file containing mask
+    subdivide: Tuple[int, int, int] = (1, 1, 1)  # subdivisions of the Miller index grid
+    max_spread: float = 1.0  # maximum angular spread (degrees) for binning partial observations
+    nproc: int = 1  # number of parallel processes (or 1 for sequential, -1 for all CPUs, -N for all but N+1)
+    outfile: str = "integrated.nxs"  # name of the output NeXus file
 
-    return parser
+    def __post_init__(self):
+        """Validate subdivide and max_spread parameters"""
+        for i, div in enumerate(self.subdivide):
+            if div <= 0:
+                raise ValueError(f"subdivide[{i}] must be > 0, got {div}")
+        if self.max_spread <= 0:
+            raise ValueError(f"max_spread must be > 0, got {self.max_spread}")
 
-def run(args=None):
-    parser = parse_arguments()
-    args = parser.parse_args(args)
 
-    MI = loadobj(args.geom,'miller_index')
-    IS = loadobj(args.data,'image_series')
+def run_integrate(params):
+    """Run the integrate script"""
+    geom = params.geom
+    data = params.data
+    outfile = params.outfile
+    nproc = params.nproc
+    ndiv = params.subdivide
+    max_degrees = params.max_spread
+    maskfile = params.mask
 
-    if args.mask is not None:
-        #MA = loadobj(args.mask,'mask')
-        #mask = MA.data
-        nxs = nxload(args.mask) # <-- loadobj fails if the array is too large. weird
-        mask = nxs.entry.mask.signal # nxfield
+    logger.info("Loading geometry and image data...")
+    MI = loadobj(geom, "miller_index")
+    IS = loadobj(data, "image_series")
 
+    if maskfile is not None:
+        logger.info("Loading mask...")
+        # Use nxload directly instead of loadobj because loadobj fails for very large arrays
+        nxs = nxload(maskfile)
+        mask = nxs.entry.mask.signal  # nxfield
     else:
         mask = None
-
-    #if opts.limits is not None:
-    #    lim = opts.limits
-    #else:
-    #    lim = None
-
-    ndiv = args.subdivide
-
-    max_degrees = args.max_spread
 
     def intchunk(sl):
         ims = IS[sl]
         if mask is not None:
-            tab = ims.index(MI,mask=mask[sl].nxdata) # added nxdata to deal with NXfield wrapper
+            tab = ims.index(MI, mask=mask[sl].nxdata)  # added nxdata to deal with NXfield wrapper
         else:
             tab = ims.index(MI)
         tab.ndiv = ndiv
-        return tab.bin(count_name='pixels')
+        return tab.bin(count_name="pixels")
 
-    if args.nproc == 1:
-        T = [] # list of tables
-        print(f'Looping through chunks')
-        for ind,sl in enumerate(IS.chunk_slice_iterator()):
-            T.append(intchunk(sl))
-            print(f'  binned chunk {ind}')
-    else:
+    slices = list(IS.chunk_slice_iterator())
+    logger.info("Integrating {} image chunks (requested n_jobs: {})...", len(slices), nproc)
+    with Parallel(n_jobs=nproc, verbose=10) as parallel:
+        log_parallel_backend(parallel)
+        T = parallel(delayed(intchunk)(sl) for sl in slices)
+    logger.info("Integration completed")
 
-        with Parallel(n_jobs=args.nproc,verbose=10) as parallel:
-            T = parallel(delayed(intchunk)(sl) for sl in IS.chunk_slice_iterator())
+    logger.info("Summing partial observations over {} chunks...", len(T))
 
-    print(f'Summing partial observations over {len(T)} chunks')
-    df = HKLTable.concatenate(T).to_frame()#.set_index(['h','k','l'])
+    # Handle empty results
+    if not T:
+        raise ValueError(
+            "No integration results produced. The image series may be empty, or no valid data was found to integrate."
+        )
 
-    df['tmp'] = df['phi']/df['pixels']
-    delta_phi = df.tmp - df.groupby(['h','k','l'])['tmp'].transform('min')
-    df['n'] = np.floor(delta_phi/max_degrees)
-    df = df.drop(columns=['tmp'])
+    df = HKLTable.concatenate(T).to_frame()  # .set_index(['h','k','l'])
 
-    df = df.groupby(['h','k','l','n']).sum()
+    df["tmp"] = df["phi"] / df["pixels"]
+    delta_phi = df.tmp - df.groupby(["h", "k", "l"])["tmp"].transform("min")
+    df["n"] = np.floor(delta_phi / max_degrees)
+    df = df.drop(columns=["tmp"])
+
+    df = df.groupby(["h", "k", "l", "n"]).sum()
 
     # compute mean positions in the scan
-    df['phi'] = df['phi']/df['pixels']
-    df['iy'] = df['iy']/df['pixels']
-    df['ix'] = df['ix']/df['pixels']
+    df["phi"] = df["phi"] / df["pixels"]
+    df["iy"] = df["iy"] / df["pixels"]
+    df["ix"] = df["ix"] / df["pixels"]
 
-    print(f'  binned from {np.sum([len(t) for t in T])} to {len(df)} voxels')
-
-    print(f"Saving table of integrated data to {args.outfile}")
+    voxels_before = np.sum([len(t) for t in T])
+    voxels_after = len(df)
+    logger.info("Binned from {} to {} voxels", voxels_before, voxels_after)
 
     hkl_table = HKLTable.from_frame(df)
-    hkl_table.ndiv = ndiv # lost in conversion to/from dataframe
+    hkl_table.ndiv = ndiv  # lost in conversion to/from dataframe
 
     hkl_table.h = hkl_table.h.astype(np.float32)
     hkl_table.k = hkl_table.k.astype(np.float32)
@@ -110,9 +117,17 @@ def run(args=None):
     hkl_table.counts = hkl_table.counts.astype(np.int32)
     hkl_table.pixels = hkl_table.pixels.astype(np.int32)
 
-    saveobj(hkl_table,args.outfile,name='hkl_table',append=False)
+    logger.info("Saving integrated data to {}...", outfile)
+    saveobj(hkl_table, outfile, name="hkl_table", append=False)
+    logger.info("Integration completed successfully")
 
-    print('done!')
+
+# NOTE: parse_arguments is imported by the testing framework
+parse_arguments = make_argument_parser(Parameters, __doc__)
+
+# NOTE: run is the main entry point for the command line script
+run = with_parsing(parse_arguments)(with_logging()(run_integrate))
+
 
 if __name__ == "__main__":
     run()
