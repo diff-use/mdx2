@@ -8,10 +8,12 @@ from typing import Optional, Tuple
 import numpy as np
 from joblib import Parallel, delayed
 from loguru import logger
+from nexusformat.nexus import NXdata
 from simple_parsing import field
 
 from mdx2.command_line import log_parallel_backend, make_argument_parser, with_logging, with_parsing
 from mdx2.data import HKLTable
+from mdx2.geometry import DynamicMask
 from mdx2.io import (
     loadobj,
     nxload,  # mask is too big to read all at once?
@@ -58,14 +60,20 @@ def run_integrate(params):
         logger.info("Loading mask...")
         # Use nxload directly instead of loadobj because loadobj fails for very large arrays
         nxs = nxload(maskfile)
-        mask = nxs.entry.mask.signal  # nxfield
+        if isinstance(nxs.entry.mask, NXdata):  # regular mask
+            mask = nxs.entry.mask.signal  # nxfield
+        else:  # dynamic mask
+            mask = DynamicMask.from_nexus(nxs.entry.mask)
     else:
         mask = None
 
     def intchunk(sl):
         ims = IS[sl]
         if mask is not None:
-            tab = ims.index(MI, mask=mask[sl].nxdata)  # added nxdata to deal with NXfield wrapper
+            if isinstance(mask, DynamicMask):
+                tab = ims.index(MI, mask=mask)  # pass it directly, let index call mask.evaluate()
+            else:
+                tab = ims.index(MI, mask=mask[sl].nxdata)  # added nxdata to deal with NXfield wrapper
         else:
             tab = ims.index(MI)
         tab.ndiv = ndiv

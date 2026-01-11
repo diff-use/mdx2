@@ -1,103 +1,70 @@
-"""Generate image masks for integration"""
+"""Generate image masks for integration
 
+Examples:
+
+mdx2.define_mask peaks.nxs --contour_level 3.0 --exclude True --outfile mask.nxs
+
+"""
+
+import re
 from dataclasses import dataclass
-from typing import Optional
 
 from loguru import logger
-from simple_parsing import subgroups
+from simple_parsing import field
 
 from mdx2.command_line import make_argument_parser, with_logging, with_parsing
+from mdx2.geometry import DynamicMask, GaussianPeakMask, ResolutionMask
 from mdx2.io import loadobj, saveobj
 
 
 @dataclass
-class MaskType:
-    pass
-
-
-@dataclass
-class GaussianPeakMask(MaskType):
+class Parameters:
     """A 3D gaussian, e.g. from mdx2.fit_peaks"""
 
-    peaks: str  # file containing the peak_model (required)
+    geom: str = field(positional=False)  # file containing the crystal (required for d_min) and symmetry objects
+    peaks: str = field(positional=True)  # file containing the peak_model (required)
     contour_level: float = 3.0  # contour level of the peak mask (standard deviations)
-    exclude: bool = True  # True means pixels within the contour are excluded, otherwise polarity is flipped
+    exclude_peaks: bool = True  # True means pixels within the contour are excluded, otherwise polarity is flipped
+    d_min: float = None  # data beyond resolution d_min are masked
+    outfile: str = "mask.nxs"
 
     def __post_init__(self):
         """Validate contour_level parameter"""
         if self.contour_level <= 0:
             raise ValueError(f"contour_level must be > 0, got {self.contour_level}")
-
-
-@dataclass
-class ResolutionMask(MaskType):
-    """Remove peaks as a function of resolution"""
-
-    geom: str  # file containing the crystal (required)
-    d_min: Optional[float] = None  # highest resolution to include
-    d_max: Optional[float] = None
-    exclude: bool = False  # False means only include pixels within the resolution range
-
-    def __post_init__(self):
-        """Either d_min or d_max (or both) must be set, and both must be greater than zero and in correct order"""
-        if self.d_min is None and self.d_max is None:
-            raise ValueError("Either d_min or d_max must be set")
+        if self.d_min is not None and self.geom is None:
+            raise ValueError("If d_min is specified, geom must also be provided")
         if self.d_min is not None and self.d_min <= 0:
-            raise ValueError(f"Expected d_min > 0, got {self.d_min}")
-        if self.d_max is not None and self.d_max <= 0:
-            raise ValueError(f"Expected d_max > 0, got {self.d_max}")
-        if self.d_max is not None and self.d_min is not None and self.d_min >= self.d_max:
-            raise ValueError(f"Expected d_max > d_min, got d_max={self.d_max}, d_min={self.d_min}")
-
-
-class Parameters:
-    """Options for creating a peak mask"""
-
-    outfile: str = "mask.nxs"  # name of the output NeXus file
-    masking: MaskType = subgroups(
-        {"gaussian_peak": GaussianPeakMask, "resolution": ResolutionMask},
-        default="gaussian_peak",
-    )
-
-
-def define_resolution_mask(params):
-    crystal = loadobj(params.geom, "crystal")
-    mask_expressions = []
-    if params.d_min is not None:
-        pass # create the d_min mask expression and append to mask_expressions
-    if params.d_max is not None:
-        pass # create the d_max mask expression and append to mask_expressions
-    if len(mask_expressions) == 2:
-        expr = f"({}) & ({})".format(*mask_expressions)
-    elif len(mask_expressions) == 1:
-        expr = mask_expressions[0]
-    else:
-        raise RuntimeError("No resolution conditions were defined") # should never happen if using dataclass to validate
-    if params.exclude: # the area between the resolution cutoffs is excluded (e.g. for removing ice rings)
-        expr = f"~({expr})"
-    raise NotImplementedError("Resolution mask not yet implemented")
-    return expr
-
-
-def define_gaussian_peak_mask(params):
-    peak_model = loadobj(params.peaks, "peak_model")
-    raise NotImplementedError("Resolution mask not yet implemented")
+            raise ValueError(f"d_min must be > 0, got {self.d_min}")
 
 
 def run_define_mask(params):
     """Create the mask definition and write to a file"""
-    outfile = params.outfile
 
-    if isinstance(params.masking, GaussianPeakMask):
-        maskobj = define_gaussian_peak_mask(params.masking)
-    elif isinstance(params.masking, ResolutionMask):
-        maskobj = define_resolution_mask(params.masking)
-    else:
-        raise ValueError(f"Unknown masking parameter type {params.masking}")
+    logger.info("Loading peak model from {}...", params.peaks)
+    peak_model = loadobj(params.peaks, "peak_model")
 
-    saveobj(maskobj, outfile, name="mask")
+    logger.info("Creating peak mask with contour level {}...", params.contour_level)
+    mask = GaussianPeakMask(peak_model.r0, peak_model.sigma, params.contour_level)
 
-    logger.info("Saving mask to {}...", outfile)
+    symmetry = loadobj(params.geom, "symmetry")
+    if symmetry.reflection_conditions:  # remove forbidden reflections from the mask
+        logger.info("Applying reflection conditions {}...", symmetry.reflection_conditions)
+        expr = re.sub(r"(?<!\w)(h|k|l)(?!\w)", r"floor(\1 + 0.5)", symmetry.reflection_conditions)
+        is_refl = DynamicMask(expr, "h", "k", "l")
+        mask = mask & is_refl
+
+    if not params.exclude_peaks:  #  flip the peak mask
+        mask = ~mask  # include everything that is not a peak
+
+    if params.d_min is not None:  # apply the resolution mask
+        logger.info("reading crystal from {} for d_min mask...", params.geom)
+        crystal = loadobj(params.geom, "crystal")
+        rmask = ResolutionMask(crystal.ub_matrix, params.d_min)
+        mask = rmask | mask  # combine the masks
+
+    logger.info("Saving mask to {}...", params.outfile)
+    saveobj(mask, params.outfile, name="mask")
 
 
 # NOTE: parse_arguments is imported by the testing framework

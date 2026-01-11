@@ -555,6 +555,9 @@ class DenseImageSeries(_ImageSeriesBase):
         exposure_times = np.moveaxis(exposure_times, 2, 0)
         msk = self.data != self._maskval
         if mask is not None:
+            # first, check if mask is an ndarray:
+            if not isinstance(mask, np.ndarray) and hasattr(mask, "evaluate"):  # HACK: duck typing for dynamic masks
+                mask = mask.evaluate(h=mi.h, k=mi.k, l=mi.l)
             msk = msk & ~mask  # mask is true when pixels are excluded
         return HKLTable(
             mi.h[msk],

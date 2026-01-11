@@ -1,3 +1,4 @@
+import re
 import numexpr as ne
 import numpy as np
 from nexusformat.nexus import NXdata, NXfield, NXgroup, NXsample
@@ -142,12 +143,14 @@ class DynamicMask:
         return NXgroup(
             name="mask",
             expr=self._expr,
+            varnames=self._varnames,
         )
 
     @classmethod
     def from_nexus(cls, nxobj):
         maskobj = cls.__new__(cls)
         maskobj._expr = nxobj.expr.nxvalue
+        maskobj._varnames = set(nxobj.varnames.nxvalue)
         return maskobj
 
 
@@ -159,7 +162,8 @@ class GaussianPeakMask(DynamicMask):
         The region withing the peak (qform < contour^2) is masked out
         """
         peak_model = GaussianPeak(r0, sigma)
-        qexpr = peak_model.quadform_expression(x="(h - round(h))", y="(k - round(k))", z="(l - round(l))")
+        # NOTE: round() is not available until numexpr 2.13, so we use floor(x+0.5) instead
+        qexpr = peak_model.quadform_expression(x="(h - floor(h+0.5))", y="(k - floor(k+0.5))", z="(l - floor(l+0.5))")
         cl2 = float(contour_level) ** 2
         expr = f"{cl2} > ({qexpr})"
         super().__init__(expr, "h", "k", "l")
@@ -182,7 +186,7 @@ class ResolutionMask(DynamicMask):
         a_expr = "{v_00}*{x} + {v_01}*{y} + {v_02}*{z}"
         b_expr = "{v_10}*{x} + {v_11}*{y} + {v_12}*{z}"
         c_expr = "{v_20}*{x} + {v_21}*{y} + {v_22}*{z}"
-        expr = f"sqrt(({a_expr})**2 + ({b_expr})**2 + ({c_expr})**2)"
+        expr = f"({a_expr})**2 + ({b_expr})**2 + ({c_expr})**2"
 
         # substitute in the numerical values for the coefficients
         coeffs = {
