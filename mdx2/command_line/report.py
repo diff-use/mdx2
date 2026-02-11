@@ -72,16 +72,19 @@ class ScalingModelParameters(ExecutableNotebook):
 
     _template_name = "scaling_model"
 
-    input_files: list[str] = field(default_factory=list)  # list of input file paths.
-    model_names: list[str] = field(default_factory=list)  # list of model names to include in the report
+    input_files: list[str]  # list of input file paths, required
+    model_names: Optional[list[str]] = (
+        None  # optional list of model names, overriding defaults defined in scaling_model.ipynb
+    )
+    shared_detector_model: Optional[bool] = None  # set to False to show separate detector models for each input file.
 
 
 @dataclass
 class Parameters:
     """parameters for the report generation"""
 
-    report: Union[TemplateParameters, VisualizationParameters] = subparsers(
-        {p._template_name: p for p in [TemplateParameters, VisualizationParameters]},
+    report: Union[TemplateParameters, ScalingModelParameters] = subparsers(
+        {p._template_name: p for p in [TemplateParameters, ScalingModelParameters]},
     )
     metadata: Metadata = Metadata()  # metadata fields that can be overridden on the CLI
 
