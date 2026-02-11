@@ -1,14 +1,22 @@
 """report generation utilities"""
 
+import glob
 import os
 import platform
 import subprocess
 from datetime import datetime
-from importlib import resources
 
 import papermill as pm
 
 import mdx2  # for version info
+
+# a glob string matching all notebook templates
+_templates_glob = os.path.join(os.path.dirname(__file__), "templates", "*.ipynb")
+
+# need to search TEMPLATES_DIR for all .ipynb files and create a dict mapping template names (without .ipynb)
+TEMPLATES = {os.path.splitext(os.path.basename(path))[0]: path for path in glob.glob(_templates_glob)}
+
+# TODO: allow users to override certain metadata fields, such as author.
 
 
 def _get_default_metadata():
@@ -50,7 +58,7 @@ def _get_default_metadata():
     }
 
 
-def execute_notebook(template_name, output_path=None, parameters={}, **kwargs):
+def execute_notebook(template_name, output_path=None, parameters={}, metadata={}, **kwargs):
     """execute a notebook template and save the result to output_path
 
     Parameters
@@ -61,6 +69,8 @@ def execute_notebook(template_name, output_path=None, parameters={}, **kwargs):
         path to save the executed notebook to. If None, the template name will be used (with .ipynb extension)
     parameters : dict, optional
         dictionary of parameters to pass to the notebook template.
+    metadata : dict, optional
+        dictionary of metadata fields, will override any default metadata fields populated by mdx2.report.
     **kwargs
         additional keyword arguments to pass to papermill.execute_notebook.
 
@@ -71,15 +81,31 @@ def execute_notebook(template_name, output_path=None, parameters={}, **kwargs):
     None
     """
 
+    # get the path to the notebook template
+    template_path = TEMPLATES.get(template_name)
+    if template_path is None:
+        raise ValueError(f"Template '{template_name}' not found. Available templates: {list(TEMPLATES.keys())}")
+
     if output_path is None:
         output_path = f"{template_name}.ipynb"
 
-    default_metadata = _get_default_metadata()
+    _metadata = _get_default_metadata()
+    _metadata["notebook_template"] = template_name
 
-    # allow user parameters to override default metadata
-    parameters = {**default_metadata, **parameters, "notebook_template": template_name}
+    # allow user to override metadata using the metadata argument
+    # disregard any keys with a value of None.
+    for key, value in metadata.items():
+        if value is not None:
+            _metadata[key] = value
 
-    # get the path to the notebook template
-    template_resource = resources.files("mdx2.report").joinpath("templates", f"{template_name}.ipynb")
-    with resources.as_file(template_resource) as template_path:
-        pm.execute_notebook(input_path=template_path, output_path=output_path, parameters=parameters, **kwargs)
+    injected_parameters = {}
+    # add all parameters to injected_parameters, except those with a value of None
+    # these are treated as optional parameters (do not override the defaults defined in the notebook)
+    for key, value in parameters.items():
+        if value is not None:
+            injected_parameters[key] = value
+
+    # inject metadata into parameters
+    injected_parameters["_metadata"] = _metadata
+
+    pm.execute_notebook(input_path=template_path, output_path=output_path, parameters=injected_parameters, **kwargs)
