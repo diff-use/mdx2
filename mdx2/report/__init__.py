@@ -2,6 +2,7 @@
 
 import glob
 import os
+import pathlib
 import platform
 import subprocess
 from datetime import datetime
@@ -14,7 +15,7 @@ import mdx2  # for version info
 _templates_glob = os.path.join(os.path.dirname(__file__), "templates", "*.ipynb")
 
 # need to search TEMPLATES_DIR for all .ipynb files and create a dict mapping template names (without .ipynb)
-TEMPLATES = {os.path.splitext(os.path.basename(path))[0]: path for path in glob.glob(_templates_glob)}
+TEMPLATES = {os.path.splitext(os.path.basename(path))[0]: pathlib.Path(path) for path in glob.glob(_templates_glob)}
 
 # TODO: allow users to override certain metadata fields, such as author.
 
