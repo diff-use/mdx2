@@ -44,10 +44,10 @@ class ExecutableNotebook:
 
 
 @dataclass
-class TemplateParameters(ExecutableNotebook):
+class _ExampleParameters(ExecutableNotebook):
     """dummy template for testing purposes"""
 
-    _template_name = "_template"
+    _template_name = "_example"
 
     input_files: list[str]  # list of input file paths, required
     model_names: Optional[list[str]] = (
@@ -62,13 +62,13 @@ class VisualizationParameters(ExecutableNotebook):
 
     _template_name = "visualization"
 
-    geom: str  # NeXus file containing symmetry and crystal
-    hkl: str  # NeXus file containing hkl_table
+    merged_file: str  # NeXus file containing the merged hkl_table
+    geometry_file: str  # NeXus file containing symmetry and crystal
 
 
 @dataclass
 class ScalingModelParameters(ExecutableNotebook):
-    """parameters for the visualization.ipynb template"""
+    """parameters for the scaling_model.ipynb template"""
 
     _template_name = "scaling_model"
 
@@ -83,8 +83,8 @@ class ScalingModelParameters(ExecutableNotebook):
 class Parameters:
     """parameters for the report generation"""
 
-    report: Union[TemplateParameters, ScalingModelParameters] = subparsers(
-        {p._template_name: p for p in [TemplateParameters, ScalingModelParameters]},
+    report: Union[_ExampleParameters, ScalingModelParameters, VisualizationParameters] = subparsers(
+        {p._template_name: p for p in [_ExampleParameters, ScalingModelParameters, VisualizationParameters]},
     )
     metadata: Metadata = Metadata()  # metadata fields that can be overridden on the CLI
 

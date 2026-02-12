@@ -8,7 +8,7 @@ import nbformat
 import pytest
 from papermill import inspect_notebook
 
-from mdx2.command_line.report import TemplateParameters, ScalingModelParameters
+from mdx2.command_line.report import _ExampleParameters, ScalingModelParameters, VisualizationParameters
 from mdx2.report import TEMPLATES
 
 SUPPORTED_TYPES = []
@@ -85,8 +85,9 @@ def test_template_parameters_valid(template_name, template_path):
 @pytest.mark.parametrize(
     "ParametersDataclass",
     [
-        TemplateParameters,
+        _ExampleParameters,
         ScalingModelParameters,
+        VisualizationParameters,
     ],
 )
 def test_dataclass_matches_template(ParametersDataclass):
