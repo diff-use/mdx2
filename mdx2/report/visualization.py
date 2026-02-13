@@ -1,12 +1,14 @@
 """helper functions for the visualization report"""
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 from mdx2.data import HKLTable
 
 
-def unique_slices(symmetry):
+# TODO: return a generator instead of a dict?
+def unique_slices(symmetry, offset=0.5):
     """
     Determine the unique slice directions according to symmetry.
 
@@ -29,11 +31,7 @@ def unique_slices(symmetry):
             # check if t0j is already in unique_slices, if not, add it:
             if unique_hkl0j not in unique_slices:
                 unique_slices[unique_hkl0j] = (axis, coord)
-
-    slice_lookup = {0: [], 1: [], 2: []}  # i.e. h,k,l
-    for axis, coord in unique_slices.values():
-        slice_lookup[axis].append(coord)
-    return slice_lookup
+                yield axis, coord * offset
 
 
 def extract_central_slice(hkl_table, symmetry, crystal, slice_index, slice_coordinate=0.0, signal="intensity"):
@@ -63,33 +61,94 @@ def extract_central_slice(hkl_table, symmetry, crystal, slice_index, slice_coord
 
     slice_data = hkl_table.lookup(hkl_slice.h, hkl_slice.k, hkl_slice.l, signal).reshape(h.shape)
 
+    sx, sy, sz = _get_cartesian_coordinates(h, k, l, crystal, slice_index)
+
     slice_arr = xr.DataArray(
         data=slice_data,
         dims=["h", "k", "l"],
-        coords={"h": h_axis, "k": k_axis, "l": l_axis},
+        coords={
+            "h": h_axis,
+            "k": k_axis,
+            "l": l_axis,
+            "sx": (("h", "k", "l"), sx),
+            "sy": (("h", "k", "l"), sy),
+            "sz": (("h", "k", "l"), sz),
+        },
     )
+    # convert to 2D array
+    slice_axis = slice_arr.dims[slice_index]
+    slice_arr = slice_arr.isel(**{slice_axis: 0})
 
     return slice_arr
 
 
-def hkl_to_cartesian(slice_arr, crystal, slice_index):
-    """Convert a slice from fractional to Cartesian coordinates."""
+def _get_cartesian_coordinates(h, k, l, crystal, slice_index):
     UB = _reorient_reciprocal_axes(crystal.ub_matrix, slice_index)
-    h, k, l = np.meshgrid(slice_arr.coords["h"], slice_arr.coords["k"], slice_arr.coords["l"], indexing="ij")
     hkl = np.stack((h, k, l))
     sxyz = np.tensordot(UB, hkl, axes=1)
-    slice_cart = xr.DataArray(
-        data=slice_arr.data,
-        dims=["h", "k", "l"],
-        coords={
-            "sx": (("h", "k", "l"), sxyz[0, ...]),
-            "sy": (("h", "k", "l"), sxyz[1, ...]),
-            "sz": (("h", "k", "l"), sxyz[2, ...]),
-        },
+    return sxyz[0, ...], sxyz[1, ...], sxyz[2, ...]
+
+
+def calc_isoavg(hkl_table, symmetry, crystal, bin_width=0.01):
+    """Calculate the isotropic average of the intensity as a function of |s|.
+
+    Points are excluded if they fall at a Bragg peak location (integer h,k,l satisfying reflection conditions).
+
+    Returns two numpy arrays: s, and intensity, suitable for interpolation over the full range of data in hkl_table.
+    """
+
+    def is_integer(x):
+        return np.isclose(x, np.round(x), atol=1e-5)
+
+    def is_reflection(h, k, l):
+        return is_integer(h) & is_integer(k) & is_integer(l) & symmetry.is_reflection(h, k, l)
+
+    UB = crystal.ub_matrix
+    s = UB @ np.stack((hkl_table.h, hkl_table.k, hkl_table.l))
+    s = np.sqrt(np.sum(s * s, axis=0))
+    df = pd.DataFrame({"s": s, "intensity": hkl_table.intensity, "intensity_error": hkl_table.intensity_error})
+
+    df = df[~is_reflection(hkl_table.h, hkl_table.k, hkl_table.l)]
+
+    smax = s.max()
+    bin_edges = np.linspace(0, smax, int(smax / bin_width) + 1)
+    s_bins = pd.cut(df["s"], bins=bin_edges)
+    df_isoavg = (
+        df.groupby(s_bins)
+        .agg(
+            {
+                "s": ["mean", "count"],
+                "intensity": ["mean", "std"],
+                "intensity_error": "mean",
+            }
+        )
+        .set_index(("s", "mean"))
     )
-    # convert to 2D array
-    slice_cart = slice_cart.isel(**[{"h": 0}, {"k": 0}, {"l": 0}][slice_index])
-    return slice_cart
+    df_isoavg["ioversigma"] = df_isoavg[("intensity", "mean")] / df_isoavg[("intensity_error", "mean")]
+
+    # first, drop any rows with NaN values in the index (i.e. ("s", "count") == 0)
+    df_isoavg = df_isoavg[df_isoavg[("s", "count")] != 0]
+
+    # apply some sane filters.
+    # if count < 10, or intensity/intensity_error < 1, set intensity to NaN
+    df_isoavg.loc[df_isoavg[("s", "count")] < 10, ("intensity", "mean")] = np.nan
+    df_isoavg.loc[df_isoavg["ioversigma"] < 1, ("intensity", "mean")] = np.nan
+
+    # add rows for s=0 and s=smax, with intensity = np.nan
+    df_isoavg.loc[0] = np.nan
+    df_isoavg.loc[smax] = np.nan
+
+    # sort by index
+    df_isoavg = df_isoavg.sort_index()
+
+    # fill the nans
+    df_isoavg[("intensity", "mean")] = df_isoavg[("intensity", "mean")].interpolate(method="nearest").ffill().bfill()
+
+    # get values to return as numpy arrays
+    s_values = df_isoavg.index.values
+    intensity_values = df_isoavg[("intensity", "mean")].values
+
+    return s_values, intensity_values
 
 
 def _reorient_reciprocal_axes(UB, slice_index):

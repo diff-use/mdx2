@@ -64,6 +64,9 @@ class VisualizationParameters(ExecutableNotebook):
 
     merged_file: str  # NeXus file containing the merged hkl_table
     geometry_file: str  # NeXus file containing symmetry and crystal
+    cartesian_coordinates: bool = (
+        True  # whether to plot the slices in cartesian coordinates (sx, sy) or Miller indices (h, k, l).
+    )
 
 
 @dataclass
