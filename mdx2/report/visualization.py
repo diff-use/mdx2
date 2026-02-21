@@ -89,32 +89,41 @@ def _get_cartesian_coordinates(h, k, l, crystal, slice_index):
     return sxyz[0, ...], sxyz[1, ...], sxyz[2, ...]
 
 
-def calc_isoavg(hkl_table, symmetry, crystal, bin_width=0.01):
-    """Calculate the isotropic average of the intensity as a function of |s|.
-
-    Points are excluded if they fall at a Bragg peak location (integer h,k,l satisfying reflection conditions).
-
-    Returns two numpy arrays: s, and intensity, suitable for interpolation over the full range of data in hkl_table.
+def _trim(series: "pd.Series", fraction: float = 0.25) -> "pd.Series[bool]":
     """
+    Return a boolean mask (same index) that is True except at the indices
+    of the N smallest and N largest values of `series`.
+    """
+    n = int(np.round(fraction * series.size))
+    if n <= 0 or series.size < 20:  # if there are too few points, don't trim anything
+        return pd.Series(True, index=series.index, dtype=bool)
 
-    def is_integer(x):
-        return np.isclose(x, np.round(x), atol=1e-5)
+    small_idx = series.nsmallest(n).index
+    large_idx = series.nlargest(n).index
 
-    def is_reflection(h, k, l):
-        return is_integer(h) & is_integer(k) & is_integer(l) & symmetry.is_reflection(h, k, l)
+    mask = pd.Series(True, index=series.index, dtype=bool)
+    mask.loc[small_idx] = False
+    mask.loc[large_idx] = False
+    return mask
 
+
+def calc_isoavg(hkl_table, crystal, bin_width=0.01, trim_fraction=0.1):
     UB = crystal.ub_matrix
     s = UB @ np.stack((hkl_table.h, hkl_table.k, hkl_table.l))
     s = np.sqrt(np.sum(s * s, axis=0))
-    df = pd.DataFrame({"s": s, "intensity": hkl_table.intensity, "intensity_error": hkl_table.intensity_error})
-
-    df = df[~is_reflection(hkl_table.h, hkl_table.k, hkl_table.l)]
-
     smax = s.max()
     bin_edges = np.linspace(0, smax, int(smax / bin_width) + 1)
+
+    df = pd.DataFrame({"s": s, "intensity": hkl_table.intensity, "intensity_error": hkl_table.intensity_error})
+    df.dropna(subset=["intensity"], inplace=True)
     s_bins = pd.cut(df["s"], bins=bin_edges)
+
+    df["mask"] = df.groupby(s_bins)["intensity"].transform(lambda x: _trim(x, fraction=trim_fraction))
+    df.dropna(subset=["mask"], inplace=True)
+
     df_isoavg = (
-        df.groupby(s_bins)
+        df[df["mask"]]
+        .groupby(s_bins)
         .agg(
             {
                 "s": ["mean", "count"],
