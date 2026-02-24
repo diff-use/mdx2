@@ -1,0 +1,66 @@
+services:
+  # Service to run the Prefect server, UI, and API
+  prefect-server:
+    image: prefecthq/prefect:3-python3.11
+    command: ["prefect", "server", "start", "--host", "0.0.0.0", "--port", "4200"]
+    ports:
+      # Map container port 4200 to host port 4200 for UI access
+      - "4200:4200"
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+      - PREFECT_UI_API_URL=http://localhost:4200/api
+    networks:
+      - prefect-net
+    healthcheck: # Ensures services start in correct order
+      # This uses Python's standard library to check the health endpoint
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health').getcode()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+  # Service to run Prefect flows with mdx2 CLI commands
+  # Uses the mdx2 container which has all dependencies (micromamba, mdx2, Prefect)
+  flow-runner:
+    build:
+      context: .
+      dockerfile: dockerfile
+    working_dir: /home/dev
+    volumes:
+      # Mount parent directory so sibling directories are accessible
+      - ..:/home/workspace
+      # Mount raw data root so symlinks in raw_data/ resolve (e.g. raw_data/insulin -> /mnt/chess/20260218/insulin)
+      # Adjust the host path if your symlinks point elsewhere.
+      - /mnt/chess:/mnt/chess
+      - .:/home/dev
+    environment:
+      # NOTE: use the service name 'prefect-server' as the hostname
+      - PREFECT_API_URL=http://prefect-server:4200/api
+    networks:
+      - prefect-net
+    depends_on:
+      prefect-server:
+        condition: service_healthy # Wait for the server to be healthy
+    # Serve the mdx2 Prefect flows as deployments
+    # Using sh -c to activate conda env and add a small delay to ensure server is fully ready
+    command: ["sh", "-c", "sleep 5 && micromamba run -n mdx2-dev python -m mdx2.command_line.prefect_flows"]
+    restart: unless-stopped
+  # Service built from the local Dockerfile in this directory for manual running of mdx2 commands
+  container:
+    build:
+      context: .
+      dockerfile: dockerfile
+    working_dir: /home/dev
+    volumes:
+      - ..:/home/workspace
+      # Mount raw data root so symlinks in raw_data/ resolve inside the container
+      - /mnt/chess:/mnt/chess
+      - .:/home/dev
+    ports:
+      - "8888:8888"
+    networks:
+      - prefect-net
+    # Keep container running so we can exec into it
+    command: ["tail", "-f", "/dev/null"]
+networks:
+  prefect-net:
+    driver: bridge
