@@ -27,6 +27,9 @@ COPY . .
 
 # Install the local package in editable mode within the environment
 RUN /usr/local/bin/micromamba run -n mdx2-dev pip install -e .
+RUN /usr/local/bin/micromamba run -n mdx2-dev pip install --no-cache-dir jupyterhub jupyter-vscode-proxy
 
 EXPOSE 8888
+
+CMD ["/usr/local/bin/micromamba", "run", "-n", "mdx2-dev", "jupyterhub-singleuser"]
 
