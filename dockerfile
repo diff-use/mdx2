@@ -9,7 +9,9 @@ RUN apt-get update && apt-get install -y ca-certificates
 COPY --from=stage1 /usr/local /usr/local
 COPY --from=stage2 /bin/micromamba /usr/local/bin/micromamba
 
-ENV PATH="/root/micromamba/envs/mdx2-dev/bin:/usr/local/bin:/opt/conda/bin:$PATH"
+ENV MAMBA_ROOT_PREFIX="/root/micromamba" \
+    CONDA_PREFIX="/root/micromamba/envs/mdx2-dev" \
+    PATH="/root/micromamba/envs/mdx2-dev/bin:/usr/local/bin:/opt/conda/bin:$PATH"
 
 # Ensure /opt/conda exists for micromamba to use
 RUN mkdir -p /opt/conda
