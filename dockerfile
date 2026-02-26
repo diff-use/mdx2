@@ -21,15 +21,15 @@ WORKDIR /home/dev
 COPY env.yaml .
 
 # Use micromamba to create the environment and install packages
-RUN /usr/local/bin/micromamba create -f env.yaml -n mdx2-dev && \
-    /usr/local/bin/micromamba install -y -n mdx2-dev nexpy jupyterlab jupyterlab-h5web dials xia2 wget tar -c conda-forge && \
-    /usr/local/bin/micromamba clean --all --yes
+RUN --mount=type=cache,target=/root/micromamba/pkgs \
+    /usr/local/bin/micromamba create -f env.yaml -n mdx2-dev && \
+    /usr/local/bin/micromamba install -y -n mdx2-dev nexpy jupyterlab jupyterlab-h5web dials xia2 wget tar -c conda-forge
 
 COPY . .
 
-# Install the local package in editable mode within the environment
-RUN /usr/local/bin/micromamba run -n mdx2-dev pip install -e .
-RUN /usr/local/bin/micromamba run -n mdx2-dev pip install --no-cache-dir jupyterhub jupyter-vscode-proxy
+RUN --mount=type=cache,target=/root/.cache/pip \
+    /usr/local/bin/micromamba run -n mdx2-dev pip install -e . && \
+    /usr/local/bin/micromamba run -n mdx2-dev pip install jupyterhub jupyter-vscode-proxy
 
 EXPOSE 8888
 
