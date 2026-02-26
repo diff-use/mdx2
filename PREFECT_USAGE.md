@@ -15,24 +15,47 @@ To process all symlinks in `raw_data/` and write results to `processed_data/<nam
 To run all steps from the **insulin-tutorial** (single-crystal) example in one go:
 
 ```bash
-# From the mdx2 repo root (uses examples/insulin-tutorial by default)
-python -m mdx2.command_line.pipeline
+# With a config file (e.g. in mdx2-dev env or Docker)
+mdx2.pipeline --file single_crystal_workflow.json --working_dir /path/to/processed_data
+
+# Or as a module (--working_dir defaults to examples/insulin-tutorial if in repo, else cwd)
+python -m mdx2.command_line.pipeline --file single_crystal_workflow.json --working_dir /path/to/processed_data
 ```
+
+**Run in background with screen:** `screen -S mdx2-pipeline`, then run one of the commands above (e.g. `mdx2.pipeline --file single_crystal_workflow.json`). Detach with **Ctrl+A**, **D**. Reattach with `screen -r mdx2-pipeline` to see logs or when it finishes.
 
 Or trigger the **single-crystal-example** deployment from the Prefect UI. The flow runs **DIALS** first (when `run_dials` is true): dials.import → find_spots → index → refine, then background import; then **mdx2**: import_geometry → import_data → find_peaks → mask_peaks → background bin → integrate → correct → scale → merge → map. Set `run_dials: false` in your config if refined.expt and background.expt already exist. Config can set `crystal_images`, `background_images`, `space_group` (e.g. 199 for insulin). See `examples/insulin-tutorial/README.md` for the dataset.
 
-**Config file:** If a file **`mdx2_single_crystal.json`** exists in the current working directory (or in `working_dir` when set), the flow reads it and uses its keys to set parameters (`working_dir`, `refined_expt`, `background_expt`, `integrate_subdivide`, `count_threshold`, `sigma_cutoff`). Copy `examples/insulin-tutorial/mdx2_single_crystal.json` into your data directory and edit paths/values as needed; then run the pipeline from that directory (or set `working_dir` to it).
+**Config file:** Use **`--file`** to pass any JSON config path (e.g. `single_crystal_workflow.json`). If you omit `--file`, the flow looks for **`mdx2_single_crystal.json`** or **`deployment.json`** in the working directory. Relative paths in the config (e.g. `working_dir`, `raw_data_dir`) are resolved from the config file’s directory. Supported keys: `working_dir`, `raw_data_dir`, `run_dials`, `crystal_images`, `background_images`, `space_group`, `refined_expt`, `background_expt`, `integrate_subdivide`, `count_threshold`, `sigma_cutoff`, `nproc`, `datastore`, `datastore_bg`, `mca2020`.
 
-**Example Prefect pipeline deployment file**
+**Example config (e.g. save as `single_crystal_workflow.json`):**
+```json
 {
   "working_dir": ".",
+  "raw_data_dir": "../raw_data",
   "refined_expt": "refined.expt",
   "background_expt": "background.expt",
   "integrate_subdivide": "4 4 4",
   "count_threshold": 20,
   "sigma_cutoff": 3
 }
+```
 
+
+## Running in the background with screen
+
+Use **screen** so the process keeps running after you close the terminal (until you shut down the machine or kill the session).
+
+- **Start a named session:** `screen -S mdx2`
+- **Run your command** in that terminal (e.g. `docker compose up` or `mdx2.pipeline --file ...`).
+- **Detach** (leave it running): press **Ctrl+A**, then **D**.
+- **Reattach later:** `screen -r mdx2` (or `screen -r` if only one session).
+- **List sessions:** `screen -ls`
+- **Kill a session:** from inside the session, type `exit`, or run `screen -S mdx2 -X quit`.
+
+If `screen` is not installed: `sudo apt install screen` (Debian/Ubuntu) or equivalent.
+
+---
 
 ## Quick Start
 
@@ -40,6 +63,8 @@ Or trigger the **single-crystal-example** deployment from the Prefect UI. The fl
    ```bash
    docker compose up
    ```
+   **Run in background with screen:** Start a session (`screen -S mdx2`), run `docker compose up`, then detach with **Ctrl+A**, **D**. Reattach anytime with `screen -r mdx2`.
+
    This starts:
    - Prefect server UI at `http://localhost:4200`
    - Flow runner that serves mdx2 Prefect flows
@@ -52,6 +77,8 @@ Or trigger the **single-crystal-example** deployment from the Prefect UI. The fl
 ## Running Commands
 
 ### Option 1: Via Prefect UI
+
+**Run in background with screen:** Start the stack in a screen session first (see Quick Start). Detach with **Ctrl+A**, **D**. Open the UI in your browser from any machine; flow runs execute in the background in the flow-runner container. Reattach to the screen session with `screen -r mdx2` to see server/runner logs.
 
 1. Go to `http://localhost:4200`
 2. Navigate to "Deployments"
@@ -75,6 +102,8 @@ Or trigger the **single-crystal-example** deployment from the Prefect UI. The fl
 
 ### Option 2: Via Prefect CLI (from host machine)
 
+**Run in background with screen:** Run the stack in screen (Quick Start) so the server and flow runner keep running. In the same or another terminal, run the `prefect deployment run` command below; the triggered run executes in the flow-runner container. To keep the trigger step itself in screen (e.g. to capture output), use `screen -S prefect-trigger`, run the commands, then detach with **Ctrl+A**, **D**.
+
 First, configure Prefect to connect to the server:
 ```bash
 export PREFECT_API_URL=http://localhost:4200/api
@@ -86,6 +115,8 @@ prefect deployment run mdx2-pipeline/mdx2-pipeline-deployment
 ```
 
 ### Option 3: Via Python Script
+
+**Run in background with screen:** `screen -S mdx2-python`, run your script (e.g. `python my_pipeline.py`), then detach with **Ctrl+A**, **D**. Reattach with `screen -r mdx2-python` to see output or when it finishes.
 
 Create a Python script that uses the flows:
 
@@ -106,6 +137,8 @@ results = mdx2_pipeline_flow([
 ```
 
 ### Option 4: Direct CLI Execution (inside container)
+
+**Run in background with screen:** `screen -S mdx2-cli`, run the `docker compose exec ...` command below, then detach with **Ctrl+A**, **D**. Reattach with `screen -r mdx2-cli` to see output or when it finishes.
 
 Execute commands directly in the mdx2 container:
 ```bash
@@ -210,7 +243,7 @@ result = run_mdx2_cli_command(
 
 ## Running from Sibling Directories
 
-If you have a directory at the same level as `mdx2/` (e.g., `/data/CHESS_20260218/insulin/`), you can run mdx2 commands from that directory:
+If you have a directory at the same level as `mdx2/` (e.g., `/data/CHESS_20260218/insulin/`), you can run mdx2 commands from that directory. To run any of the commands below in the background, use **screen** as in the options above (e.g. `screen -S mdx2`, run the command, then **Ctrl+A**, **D**).
 
 ### Option 1: Using Prefect Flows with working_dir
 
@@ -274,6 +307,10 @@ results = mdx2_pipeline_flow(
 ### Flow runner can't connect to Prefect server
 - Check that both containers are on the same network: `docker compose ps`
 - Verify Prefect server is healthy: `docker compose logs prefect-server`
+- **"Unable to authenticate to the event stream"** or **ValidationError for Event**: the Prefect server image and the flow-runner’s Prefect version must match. This project uses **Prefect 2.x** (server image `prefecthq/prefect:2.20-python3.11`, flow-runner installs `prefect>=2.20,<2.21`). Do not use a Prefect 3 server image with the default flow-runner.
+
+### "database is locked" (SQLite) on the Prefect server
+- The stack uses **PostgreSQL** for the Prefect server (see the `postgres` service in `docker-compose.yml`) to avoid SQLite locking. Ensure `docker compose up` starts the `postgres` service. If you still see this error, ensure you have the latest compose (with the `postgres` service and `PREFECT_API_DATABASE_CONNECTION_URL`) and run again.
 
 ### Commands fail with import errors
 - Ensure you're using the `mdx2-dev` conda environment

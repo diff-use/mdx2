@@ -1,7 +1,25 @@
 services:
+  # PostgreSQL for Prefect server (avoids SQLite "database is locked" under load)
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: prefect
+      POSTGRES_PASSWORD: prefect
+      POSTGRES_DB: prefect
+    volumes:
+      - prefect_postgres_data:/var/lib/postgresql/data
+    networks:
+      - prefect-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prefect -d prefect"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   # Service to run the Prefect server, UI, and API
+  # Use Prefect 2.x to match the flow-runner (pip install prefect in mdx2 image).
+  # Prefect 3 server uses a different event-stream protocol and breaks the runner connection.
   prefect-server:
-    image: prefecthq/prefect:3-python3.11
+    image: prefecthq/prefect:2.20-python3.11
     command: ["prefect", "server", "start", "--host", "0.0.0.0", "--port", "4200"]
     ports:
       # Map container port 4200 to host port 4200 for UI access
@@ -9,8 +27,13 @@ services:
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api
       - PREFECT_UI_API_URL=http://localhost:4200/api
+      # Use PostgreSQL to avoid SQLite "database is locked" errors
+      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://prefect:prefect@postgres:5432/prefect
     networks:
       - prefect-net
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck: # Ensures services start in correct order
       # This uses Python's standard library to check the health endpoint
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health').getcode()"]
@@ -64,3 +87,6 @@ services:
 networks:
   prefect-net:
     driver: bridge
+
+volumes:
+  prefect_postgres_data:

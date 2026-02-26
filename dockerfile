@@ -26,8 +26,9 @@ RUN /usr/local/bin/micromamba create -f env.yaml -n mdx2-dev && \
 COPY . .
 
 # Install the local package and Prefect in editable mode within the environment
-# NOTE: Prefect is not available in conda-forge, so we use pip
-RUN /usr/local/bin/micromamba run -n mdx2-dev pip install -e . prefect
+# NOTE: Prefect is not available in conda-forge, so we use pip.
+# Pin to Prefect 2.20.x to match the prefect-server image (2.20-python3.11); newer 2.x clients send 'labels' which 2.20 server rejects.
+RUN /usr/local/bin/micromamba run -n mdx2-dev pip install -e . "prefect>=2.20,<2.21"
 
 EXPOSE 4200 8888
 

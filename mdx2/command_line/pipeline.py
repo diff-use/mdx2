@@ -9,11 +9,16 @@ scale [--mca2020] → merge → map slice → map offslice.
 
 If mdx2_single_crystal.json or deployment.json exists in the current working
 directory (or in working_dir when set), its keys are used to fill in the flow
-parameters. Use raw_data_dir to read inputs from another directory (e.g. raw_data/insulin)
-and write all outputs to working_dir (e.g. processed_data/insulin).
+parameters. Use --file to specify a config file by name. Use raw_data_dir to read
+inputs from another directory (e.g. raw_data/insulin) and write all outputs to
+working_dir (e.g. processed_data/insulin).
 
-Run from the repo root or from examples/insulin-tutorial:
-  python -m mdx2.command_line.pipeline
+Run from the mdx2-dev env (e.g. in Docker or with micromamba activate mdx2-dev):
+  mdx2.pipeline --file single_crystal_workflow.json
+  mdx2.pipeline --working_dir /path/to/processed_data
+
+Or as a module:
+  python -m mdx2.command_line.pipeline --file single_crystal_workflow.json
   python -m mdx2.command_line.pipeline --working_dir /path/to/insulin-tutorial
 """
 
@@ -69,6 +74,19 @@ def load_single_crystal_config(search_dir: Path) -> Tuple[Dict[str, Any], Option
     return {}, None
 
 
+def load_single_crystal_config_from_file(path: Path) -> Tuple[Dict[str, Any], Path]:
+    """
+    Load single-crystal pipeline parameters from an explicit config file path.
+    Returns (params_dict, path_to_file). Raises FileNotFoundError if path does not exist.
+    """
+    path = path.resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"Config file not found: {path}")
+    with open(path) as f:
+        data = json.load(f)
+    return {k: v for k, v in data.items() if k in CONFIG_KEYS}, path
+
+
 def _cmd(command: str, args: list, working_dir: Optional[str]):
     """Run one mdx2 CLI command as a Prefect task."""
     return run_mdx2_cli_command(command, args, working_dir=working_dir)
@@ -78,6 +96,7 @@ def _cmd(command: str, args: list, working_dir: Optional[str]):
 def single_crystal_workflow(
     working_dir: Optional[str] = None,
     raw_data_dir: Optional[str] = None,
+    config_file: Optional[str] = None,
     run_dials: bool = True,
     crystal_images: str = "images/insulin_2_1",
     background_images: str = "images/insulin_2_bkg",
@@ -105,9 +124,13 @@ def single_crystal_workflow(
     """
     logger = get_run_logger()
 
-    # Search for config file in working_dir or cwd
-    search_dir = Path(working_dir) if working_dir else Path.cwd()
-    config, config_path = load_single_crystal_config(search_dir)
+    # Load config: from --file path if given, else search working_dir or cwd for default names
+    if config_file:
+        config, config_path = load_single_crystal_config_from_file(Path(config_file))
+        search_dir = config_path.parent
+    else:
+        search_dir = Path(working_dir) if working_dir else Path.cwd()
+        config, config_path = load_single_crystal_config(search_dir)
     if config:
         logger.info("Loaded parameters from %s", config_path)
         working_dir = config.get("working_dir", working_dir)
@@ -344,20 +367,47 @@ def single_crystal_workflow(
     return results
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """CLI entry point: parse --file and --working_dir, then run the Prefect flow."""
+    import argparse
     import os
 
-    # Default working_dir to insulin-tutorial if we're in the mdx2 repo
+    parser = argparse.ArgumentParser(
+        description="Run the single-crystal (insulin-tutorial) Prefect pipeline."
+    )
+    parser.add_argument(
+        "--file",
+        "-f",
+        metavar="JSON",
+        default=None,
+        help="Path to workflow config JSON (e.g. single_crystal_workflow.json). "
+        "If not set, looks for mdx2_single_crystal.json or deployment.json in working dir.",
+    )
+    parser.add_argument(
+        "--working_dir",
+        "-w",
+        metavar="DIR",
+        default=None,
+        help="Working directory for outputs. Defaults to insulin-tutorial if in mdx2 repo, else cwd.",
+    )
+    args = parser.parse_args()
+
     cwd = Path.cwd()
-    insulin_tutorial = cwd / "examples" / "insulin-tutorial"
-    if insulin_tutorial.is_dir():
-        default_working_dir = str(insulin_tutorial)
+    if args.working_dir is not None:
+        working_dir = args.working_dir
+    elif (cwd / "examples" / "insulin-tutorial").is_dir():
+        working_dir = str(cwd / "examples" / "insulin-tutorial")
     else:
-        default_working_dir = str(cwd)
+        working_dir = str(cwd)
 
     api_url = os.getenv("PREFECT_API_URL", "http://prefect-server:4200/api")
     print(f"Connecting to Prefect API at: {api_url}")
-    print(f"Running single-crystal example (working_dir={default_working_dir})")
+    print(f"Running single-crystal pipeline (working_dir={working_dir})")
+    if args.file:
+        print(f"Config file: {args.file}")
 
-    # Run the flow (blocking)
-    single_crystal_workflow(working_dir=default_working_dir)
+    single_crystal_workflow(working_dir=working_dir, config_file=args.file)
+
+
+if __name__ == "__main__":
+    main()
