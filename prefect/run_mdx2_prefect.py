@@ -2,18 +2,25 @@
 """
 Helper script to easily run mdx2 CLI commands via Prefect from the command line.
 
-Usage examples:
+Usage examples (run from mdx2 repo root):
     # Run a single command
-    python run_mdx2_prefect.py map geom.nxs hkl.nxs --outfile map.nxs
+    python prefect/run_mdx2_prefect.py map geom.nxs hkl.nxs --outfile map.nxs
     
     # Run a pipeline of commands
-    python run_mdx2_prefect.py pipeline integrate geom.nxs data.nxs --outfile integrated.nxs
-    python run_mdx2_prefect.py pipeline scale integrated.nxs --outfile scaled.nxs
-    python run_mdx2_prefect.py pipeline map geom.nxs scaled.nxs --outfile map.nxs
+    python prefect/run_mdx2_prefect.py pipeline integrate geom.nxs data.nxs --outfile integrated.nxs
+    python prefect/run_mdx2_prefect.py pipeline scale integrated.nxs --outfile scaled.nxs
+    python prefect/run_mdx2_prefect.py pipeline map geom.nxs scaled.nxs --outfile map.nxs
 """
 
 import sys
-from mdx2.command_line.prefect_flows import (
+from pathlib import Path
+
+# Ensure prefect/ is on path so prefect_flows can be imported (avoids shadowing prefect library)
+_prefect_dir = Path(__file__).resolve().parent
+if str(_prefect_dir) not in sys.path:
+    sys.path.insert(0, str(_prefect_dir))
+
+from prefect_flows import (
     integrate_flow,
     map_flow,
     mdx2_pipeline_flow,

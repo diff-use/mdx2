@@ -16,19 +16,19 @@ To run all steps from the **insulin-tutorial** (single-crystal) example in one g
 
 ```bash
 # With a config file (e.g. in mdx2-dev env or Docker)
-mdx2.pipeline --file single_crystal_workflow.json --working_dir /path/to/processed_data
+mdx2.pipeline --file deployment.json --working_dir /path/to/processed_data
 
 # Or as a module (--working_dir defaults to examples/insulin-tutorial if in repo, else cwd)
-python -m mdx2.command_line.pipeline --file single_crystal_workflow.json --working_dir /path/to/processed_data
+python -m mdx2.command_line.pipeline --file deployment.json --working_dir /path/to/processed_data
 ```
 
-**Run in background with screen:** `screen -S mdx2-pipeline`, then run one of the commands above (e.g. `mdx2.pipeline --file single_crystal_workflow.json`). Detach with **Ctrl+A**, **D**. Reattach with `screen -r mdx2-pipeline` to see logs or when it finishes.
+**Run in background with screen:** `screen -S mdx2-pipeline`, then run one of the commands above (e.g. `mdx2.pipeline --file deployment.json`). Detach with **Ctrl+A**, **D**. Reattach with `screen -r mdx2-pipeline` to see logs or when it finishes.
 
 Or trigger the **single-crystal-example** deployment from the Prefect UI. The flow runs **DIALS** first (when `run_dials` is true): dials.import → find_spots → index → refine, then background import; then **mdx2**: import_geometry → import_data → find_peaks → mask_peaks → background bin → integrate → correct → scale → merge → map. Set `run_dials: false` in your config if refined.expt and background.expt already exist. Config can set `crystal_images`, `background_images`, `space_group` (e.g. 199 for insulin). See `examples/insulin-tutorial/README.md` for the dataset.
 
-**Config file:** Use **`--file`** to pass any JSON config path (e.g. `single_crystal_workflow.json`). If you omit `--file`, the flow looks for **`mdx2_single_crystal.json`** or **`deployment.json`** in the working directory. Relative paths in the config (e.g. `working_dir`, `raw_data_dir`) are resolved from the config file’s directory. Supported keys: `working_dir`, `raw_data_dir`, `run_dials`, `crystal_images`, `background_images`, `space_group`, `refined_expt`, `background_expt`, `integrate_subdivide`, `count_threshold`, `sigma_cutoff`, `nproc`, `datastore`, `datastore_bg`, `mca2020`.
+**Config file:** Use **`--file`** to pass any JSON config path (e.g. `deployment.json`). If you omit `--file`, the flow looks for **`deployment.json`** in the working directory. Relative paths in the config (e.g. `working_dir`, `raw_data_dir`) are resolved from the config file's directory. Supported keys: `working_dir`, `raw_data_dir`, `run_dials`, `crystal_images`, `background_images`, `space_group`, `refined_expt`, `background_expt`, `integrate_subdivide`, `count_threshold`, `sigma_cutoff`, `nproc`, `datastore`, `datastore_bg`, `mca2020`.
 
-**Example config (e.g. save as `single_crystal_workflow.json`):**
+**Example config (save as `deployment.json`):**
 ```json
 {
   "working_dir": ".",
@@ -118,10 +118,13 @@ prefect deployment run mdx2-pipeline/mdx2-pipeline-deployment
 
 **Run in background with screen:** `screen -S mdx2-python`, run your script (e.g. `python my_pipeline.py`), then detach with **Ctrl+A**, **D**. Reattach with `screen -r mdx2-python` to see output or when it finishes.
 
-Create a Python script that uses the flows:
+Create a Python script that uses the flows. Run from mdx2 repo root, or add the `prefect/` directory to `PYTHONPATH`:
 
 ```python
-from mdx2.command_line.prefect_flows import mdx2_pipeline_flow
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent / "prefect"))  # if needed
+from prefect_flows import mdx2_pipeline_flow
 
 # Run a pipeline
 results = mdx2_pipeline_flow([
@@ -150,7 +153,7 @@ docker compose exec container micromamba run -n mdx2-dev python -m mdx2.command_
 ### `mdx2_pipeline_flow`
 Run a sequence of mdx2 CLI commands:
 ```python
-from mdx2.command_line.prefect_flows import mdx2_pipeline_flow
+from prefect_flows import mdx2_pipeline_flow
 
 results = mdx2_pipeline_flow([
     {"command": "integrate", "args": ["geom.nxs", "data.nxs"]},
@@ -161,7 +164,7 @@ results = mdx2_pipeline_flow([
 ### `map_flow`
 Convenience flow for map command:
 ```python
-from mdx2.command_line.prefect_flows import map_flow
+from prefect_flows import map_flow
 
 result = map_flow(
     geom="geom.nxs",
@@ -175,7 +178,7 @@ result = map_flow(
 ### `integrate_flow`
 Convenience flow for integrate command:
 ```python
-from mdx2.command_line.prefect_flows import integrate_flow
+from prefect_flows import integrate_flow
 
 result = integrate_flow(
     geom="geom.nxs",
@@ -188,7 +191,7 @@ result = integrate_flow(
 ### `scale_flow`
 Convenience flow for scale command:
 ```python
-from mdx2.command_line.prefect_flows import scale_flow
+from prefect_flows import scale_flow
 
 result = scale_flow(
     hkl="integrated.nxs",
@@ -199,7 +202,7 @@ result = scale_flow(
 ### `run_mdx2_cli_command`
 Generic task to run any mdx2 CLI command:
 ```python
-from mdx2.command_line.prefect_flows import run_mdx2_cli_command
+from prefect_flows import run_mdx2_cli_command
 
 result = run_mdx2_cli_command(
     command="map",
@@ -250,7 +253,7 @@ If you have a directory at the same level as `mdx2/` (e.g., `/data/CHESS_2026021
 When calling Prefect flows, specify the `working_dir` parameter:
 
 ```python
-from mdx2.command_line.prefect_flows import run_mdx2_cli_command
+from prefect_flows import run_mdx2_cli_command
 
 # Run from a sibling directory
 result = run_mdx2_cli_command(
@@ -288,7 +291,7 @@ docker compose -f ../mdx2/docker-compose.yml exec -w /home/workspace/insulin con
 When using Prefect flows, you can use relative paths from the mounted workspace:
 
 ```python
-from mdx2.command_line.prefect_flows import mdx2_pipeline_flow
+from prefect_flows import mdx2_pipeline_flow
 
 # Use relative paths - they'll be resolved from the working_dir
 results = mdx2_pipeline_flow(
@@ -301,27 +304,3 @@ results = mdx2_pipeline_flow(
     working_dir="/home/workspace/insulin"
 )
 ```
-
-## Troubleshooting
-
-### Flow runner can't connect to Prefect server
-- Check that both containers are on the same network: `docker compose ps`
-- Verify Prefect server is healthy: `docker compose logs prefect-server`
-- **"Unable to authenticate to the event stream"** or **ValidationError for Event**: the Prefect server image and the flow-runner’s Prefect version must match. This project uses **Prefect 2.x** (server image `prefecthq/prefect:2.20-python3.11`, flow-runner installs `prefect>=2.20,<2.21`). Do not use a Prefect 3 server image with the default flow-runner.
-
-### "database is locked" (SQLite) on the Prefect server
-- The stack uses **PostgreSQL** for the Prefect server (see the `postgres` service in `docker-compose.yml`) to avoid SQLite locking. Ensure `docker compose up` starts the `postgres` service. If you still see this error, ensure you have the latest compose (with the `postgres` service and `PREFECT_API_DATABASE_CONNECTION_URL`) and run again.
-
-### Commands fail with import errors
-- Ensure you're using the `mdx2-dev` conda environment
-- The flow-runner service automatically uses the correct environment
-
-### Port conflicts
-- Prefect server uses port 4200
-- mdx2 container uses port 8888 (for Jupyter)
-- Change ports in `docker-compose.yml` if needed
-
-### Can't find files in sibling directory
-- Verify the parent directory is mounted: `docker compose exec container ls /home/workspace`
-- Check that your sibling directory exists at the same level as `mdx2/`
-- Use absolute paths from `/home/workspace/` when specifying `working_dir`

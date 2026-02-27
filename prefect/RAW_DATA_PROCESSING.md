@@ -41,8 +41,10 @@ If your symlinks point elsewhere, change the host path to match.
 
 ### 2. From Python
 
+Run from mdx2 repo root or add `prefect/` to PYTHONPATH:
+
 ```python
-from mdx2.command_line.prefect_flows import process_raw_data_flow
+from prefect_flows import process_raw_data_flow
 
 process_raw_data_flow(
     raw_dir="raw_data",

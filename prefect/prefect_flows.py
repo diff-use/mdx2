@@ -6,7 +6,6 @@ making it easy to run pipeline commands with workflow orchestration.
 """
 
 import subprocess
-import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -135,7 +134,7 @@ def run_conda_command(
 
 
 @flow(name="mdx2-pipeline", log_prints=True)
-def mdx2_pipeline_flow(
+def custom_workflow(
     commands: List[dict],
     working_dir: Optional[str] = None,
     conda_env: str = "mdx2-dev",
@@ -189,6 +188,10 @@ def mdx2_pipeline_flow(
     
     logger.success(f"Pipeline completed successfully with {len(results)} commands")
     return results
+
+
+# Public alias for the pipeline flow
+mdx2_pipeline_flow = custom_workflow
 
 
 # Convenience flows for common single-command operations
@@ -338,7 +341,7 @@ if __name__ == "__main__":
     print(f"Connecting to Prefect API at: {api_url}")
 
     serve(
-        mdx2_pipeline_flow.to_deployment(name="mdx2-pipeline-deployment"),
+        custom_workflow.to_deployment(name="custom-workflow-deployment"),
         process_raw_data_flow.to_deployment(name="process-raw-data-deployment"),
         single_crystal_workflow.to_deployment(name="single-crystal-example-deployment"),
     )

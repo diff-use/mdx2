@@ -65,7 +65,7 @@ services:
         condition: service_healthy # Wait for the server to be healthy
     # Serve the mdx2 Prefect flows as deployments
     # Using sh -c to activate conda env and add a small delay to ensure server is fully ready
-    command: ["sh", "-c", "sleep 5 && micromamba run -n mdx2-dev python -m mdx2.command_line.prefect_flows"]
+    command: ["sh", "-c", "sleep 5 && micromamba run -n mdx2-dev python prefect/prefect_flows.py"]
     restart: unless-stopped
   # Service built from the local Dockerfile in this directory for manual running of mdx2 commands
   container:

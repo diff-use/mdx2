@@ -5,9 +5,18 @@ This demonstrates:
 1. Running a single CLI command as a Prefect task
 2. Running a pipeline of multiple commands
 3. Using convenience flows for common operations
+
+Run from mdx2 repo root, or ensure prefect/ is on PYTHONPATH.
 """
 
-from mdx2.command_line.prefect_flows import (
+import sys
+from pathlib import Path
+
+_prefect_dir = Path(__file__).resolve().parent.parent / "prefect"
+if _prefect_dir.is_dir() and str(_prefect_dir) not in sys.path:
+    sys.path.insert(0, str(_prefect_dir))
+
+from prefect_flows import (
     integrate_flow,
     map_flow,
     mdx2_pipeline_flow,
