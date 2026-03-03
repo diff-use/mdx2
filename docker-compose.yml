@@ -73,11 +73,17 @@ services:
       context: .
       dockerfile: dockerfile
     working_dir: /home/dev
+    environment:
+      # mdx2 is at /home/dev/mdx2 when project root is mounted; pip editable install expects build-time path
+      - PYTHONPATH=/home/dev/mdx2
+      # Use shared Prefect server (avoids starting an ephemeral server when running pipeline with --mode prefect)
+      - PREFECT_API_URL=http://prefect-server:4200/api
     volumes:
       - ..:/home/workspace
       # Mount raw data root so symlinks in raw_data/ resolve inside the container
       - /mnt/chess:/mnt/chess
-      - .:/home/dev
+      # Mount project root (CHESS_20260218) to /home/dev when running from project root
+      - ..:/home/dev
     ports:
       - "8888:8888"
     networks:

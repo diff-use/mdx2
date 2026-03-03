@@ -5,12 +5,47 @@ This module provides Prefect flows and tasks that wrap mdx2 command-line tools,
 making it easy to run pipeline commands with workflow orchestration.
 """
 
+import json
 import subprocess
 from pathlib import Path
 from typing import List, Optional, Tuple
 
 from prefect import flow, task
 from prefect.logging import get_run_logger
+
+
+def _copy_dir_structure(src: Path, dst: Path) -> None:
+    """Create subdirectories in dst mirroring the directory structure of src. No files are copied."""
+    for item in src.rglob("*"):
+        if item.is_dir() and not item.name.startswith("."):
+            try:
+                rel = item.relative_to(src)
+                (dst / rel).mkdir(parents=True, exist_ok=True)
+            except ValueError:
+                pass  # item not under src (should not happen with rglob)
+
+
+def _default_deployment_json(crystal_name: str, raw_dir: str, processed_dir: str) -> dict:
+    """Return default deployment.json content for a crystal. raw_data_dir is relative to processed_data/<crystal>/.
+
+    crystal_files/background_files are intentionally omitted here; they are populated later by
+    populate_deployment_images based on discovered HDF5 masters.
+    """
+    return {
+        "working_dir": ".",
+        "raw_data_dir": f"../../{raw_dir}/{crystal_name}",
+        "run_dials": True,
+        "space_group": 199,
+        "refined_expt": "refined.expt",
+        "background_expt": "background.expt",
+        "integrate_subdivide": "4 4 4",
+        "count_threshold": 20,
+        "sigma_cutoff": 3,
+        "nproc": 1,
+        "datastore": "datastore",
+        "datastore_bg": "datastore_bg",
+        "mca2020": False,
+    }
 
 
 def _resolve_raw_entries(raw_dir: Path) -> List[Tuple[str, Path]]:
@@ -30,12 +65,35 @@ def _resolve_raw_entries(raw_dir: Path) -> List[Tuple[str, Path]]:
     return entries
 
 
+@task(name="populate-deployment-images", log_prints=True)
+def populate_deployment_images(deployment_file: str) -> dict:
+    """
+    Populate deployment.json with paths discovered from raw HDF5 masters:
+    - background_files: list of *_bg_*master.h5 relative to raw_data_dir
+    - crystal_files: list of non-bg *_master.h5 relative to raw_data_dir
+    """
+    from mdx2.command_line.pipeline import _populate_deployment_images
+    return _populate_deployment_images(deployment_file)
+
+
+def _tee_output_to_file(result: subprocess.CompletedProcess, log_file: str) -> None:
+    """Write stdout and stderr to log_file (tee-like behavior)."""
+    with open(log_file, "w") as f:
+        if result.stdout:
+            f.write(result.stdout)
+        if result.stderr:
+            if result.stdout and not result.stdout.endswith("\n"):
+                f.write("\n")
+            f.write(result.stderr)
+
+
 @task(name="run-mdx2-command", log_prints=True)
 def run_mdx2_cli_command(
     command: str,
     args: List[str],
     working_dir: Optional[str] = None,
     conda_env: str = "mdx2-dev",
+    log_file: Optional[str] = None,
 ) -> subprocess.CompletedProcess:
     """
     Run an mdx2 CLI command as a Prefect task.
@@ -80,6 +138,8 @@ def run_mdx2_cli_command(
             logger.info(f"STDOUT:\n{result.stdout}")
         if result.stderr:
             logger.warning(f"STDERR:\n{result.stderr}")
+        if log_file:
+            _tee_output_to_file(result, log_file)
         
         if result.returncode != 0:
             logger.error(f"Command failed with return code {result.returncode}")
@@ -87,7 +147,7 @@ def run_mdx2_cli_command(
                 result.returncode, cmd, result.stdout, result.stderr
             )
         
-        logger.success(f"Command '{command}' completed successfully")
+        logger.info(f"Command '{command}' completed successfully")
         return result
         
     except subprocess.CalledProcessError as e:
@@ -103,6 +163,7 @@ def run_conda_command(
     argv: List[str],
     working_dir: Optional[str] = None,
     conda_env: str = "mdx2-dev",
+    log_file: Optional[str] = None,
 ) -> subprocess.CompletedProcess:
     """
     Run an arbitrary command in the conda environment (e.g. DIALS commands).
@@ -123,6 +184,8 @@ def run_conda_command(
             logger.info("STDOUT:\n%s", result.stdout)
         if result.stderr:
             logger.warning("STDERR:\n%s", result.stderr)
+        if log_file:
+            _tee_output_to_file(result, log_file)
         if result.returncode != 0:
             raise subprocess.CalledProcessError(
                 result.returncode, cmd, result.stdout, result.stderr
@@ -186,7 +249,7 @@ def custom_workflow(
         )
         results.append(result)
     
-    logger.success(f"Pipeline completed successfully with {len(results)} commands")
+    logger.info(f"Pipeline completed successfully with {len(results)} commands")
     return results
 
 
@@ -259,28 +322,25 @@ def scale_flow(
     return run_mdx2_cli_command("scale", args, working_dir=working_dir)
 
 
-@flow(name="process-raw-data", log_prints=True)
-def process_raw_data_flow(
+@flow(name="directory-setup", log_prints=True)
+def directory_setup(
     raw_dir: str = "raw_data",
     processed_dir: str = "processed_data",
-    geom_file: str = "geometry.nxs",
-    data_file: str = "data.nxs",
-    mask_file: Optional[str] = None,
     working_dir: Optional[str] = None,
-    nproc: int = 1,
-    fail_fast: bool = False,
-) -> List[subprocess.CompletedProcess]:
+) -> List[Path]:
     """
-    Run the raw_data -> processed_data pipeline for all symlinks in raw_data.
-    For each entry: creates processed_data/<name>/ and runs integrate -> scale -> map.
+    Ensure raw_data and processed_data exist and that each crystal directory from
+    raw_data has a corresponding directory in processed_data. Creates any missing
+    directories. No DIALS or mdx2 commands are run.
     """
     logger = get_run_logger()
     base = Path(working_dir) if working_dir else Path.cwd()
     raw_path = (base / raw_dir).resolve()
     processed_path = (base / processed_dir).resolve()
 
-    if not raw_path.is_dir():
-        raise FileNotFoundError(f"raw_data directory not found: {raw_path}")
+    # Ensure raw_data and processed_data exist
+    raw_path.mkdir(parents=True, exist_ok=True)
+    processed_path.mkdir(parents=True, exist_ok=True)
 
     entries = _resolve_raw_entries(raw_path)
     if not entries:
@@ -288,47 +348,25 @@ def process_raw_data_flow(
         return []
 
     logger.info("Found %s entries in raw_data: %s", len(entries), [e[0] for e in entries])
-    all_results: List[subprocess.CompletedProcess] = []
+    created: List[Path] = []
 
     for name, resolved_path in entries:
         out_path = processed_path / name
-        try:
-            out_path.mkdir(parents=True, exist_ok=True)
-            geom = str(resolved_path / geom_file)
-            data = str(resolved_path / data_file)
-            integrated = str(out_path / "integrated.nxs")
-            scaled = str(out_path / "scaled.nxs")
-            map_out = str(out_path / "map.nxs")
+        out_path.mkdir(parents=True, exist_ok=True)
+        _copy_dir_structure(resolved_path, out_path)
+        deployment_file = out_path / "deployment.json"
+        if not deployment_file.exists():
+            config = _default_deployment_json(name, raw_dir, processed_dir)
+            with open(deployment_file, "w") as f:
+                json.dump(config, f, indent=2)
+                f.write("\n")
+            logger.info("Created %s", deployment_file)
+        # Fill crystal_files/background_files from discovered HDF5 masters (if present)
+        populate_deployment_images(str(deployment_file))
+        created.append(out_path)
+        logger.info("Created directory: %s (with subdirectory structure)", out_path)
 
-            if not (Path(geom).exists() and Path(data).exists()):
-                raise FileNotFoundError(
-                    f"Expected {geom_file} and {data_file} in {resolved_path}"
-                )
-
-            integrate_args = [geom, data, "--outfile", integrated, "--nproc", str(nproc)]
-            if mask_file and (resolved_path / mask_file).exists():
-                integrate_args.extend(["--mask", str(resolved_path / mask_file)])
-
-            all_results.append(
-                run_mdx2_cli_command("integrate", integrate_args, working_dir=working_dir)
-            )
-            all_results.append(
-                run_mdx2_cli_command(
-                    "scale", [integrated, "--outfile", scaled], working_dir=working_dir
-                )
-            )
-            all_results.append(
-                run_mdx2_cli_command(
-                    "map", [geom, scaled, "--outfile", map_out], working_dir=working_dir
-                )
-            )
-            logger.success("Pipeline finished for %s -> %s", name, out_path)
-        except Exception as e:
-            if fail_fast:
-                raise
-            logger.exception("Failed to process %s: %s", name, e)
-
-    return all_results
+    return created
 
 
 if __name__ == "__main__":
@@ -337,11 +375,12 @@ if __name__ == "__main__":
 
     from mdx2.command_line.pipeline import single_crystal_workflow
 
-    api_url = os.getenv("PREFECT_API_URL", "http://prefect-server:4200/api")
+    api_url = os.getenv("PREFECT_API_URL", "http://localhost:4200/api")
+    os.environ["PREFECT_API_URL"] = api_url
     print(f"Connecting to Prefect API at: {api_url}")
 
     serve(
-        custom_workflow.to_deployment(name="custom-workflow-deployment"),
-        process_raw_data_flow.to_deployment(name="process-raw-data-deployment"),
-        single_crystal_workflow.to_deployment(name="single-crystal-example-deployment"),
+        custom_workflow.to_deployment(name="custom-workflow"),
+        directory_setup.to_deployment(name="directory-setup"),
+        single_crystal_workflow.to_deployment(name="single-crystal-workflow"),
     )

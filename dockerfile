@@ -4,7 +4,7 @@ FROM mambaorg/micromamba:1.5.5 AS stage2
 
 FROM debian:stable-slim AS final
 
-RUN apt-get update && apt-get install -y ca-certificates
+RUN apt-get update && apt-get install -y ca-certificates git
 
 COPY --from=stage1 /usr/local /usr/local
 COPY --from=stage2 /bin/micromamba /usr/local/bin/micromamba
@@ -27,8 +27,9 @@ COPY . .
 
 # Install the local package and Prefect in editable mode within the environment
 # NOTE: Prefect is not available in conda-forge, so we use pip.
-# Pin to Prefect 2.20.x to match the prefect-server image (2.20-python3.11); newer 2.x clients send 'labels' which 2.20 server rejects.
-RUN /usr/local/bin/micromamba run -n mdx2-dev pip install -e . "prefect>=2.20,<2.21"
+# Pin to Prefect 2.20.25 to match the prefect-server image. Prefect 3.x uses a different API and is incompatible.
+RUN /usr/local/bin/micromamba run -n mdx2-dev pip install -e . "prefect==2.20.25" && \
+    /usr/local/bin/micromamba run -n mdx2-dev pip install git+https://github.com/FlexXBeamline/dials-extensions
 
 EXPOSE 4200 8888
 
