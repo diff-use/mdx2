@@ -30,6 +30,7 @@ Or as a module:
 
 import json
 import logging
+import shlex
 import os
 import subprocess
 import sys
@@ -71,6 +72,25 @@ except Exception:
 _log = logging.getLogger(__name__)
 
 
+def _shell_join(args: List[Any]) -> str:
+    """Return a shell-safe, human-readable command string."""
+    return " ".join(shlex.quote(str(arg)) for arg in args)
+
+
+def _announce_command(
+    tool_name: str,
+    command: List[Any],
+    working_dir: Optional[str] = None,
+    logger: Optional[Any] = None,
+) -> None:
+    """Print and log command line before execution."""
+    cmd_str = _shell_join(command)
+    cwd = working_dir or str(Path.cwd())
+    message = f"[{tool_name}] {cmd_str} (cwd={cwd})"
+    print(message)
+    (logger or _log).info(message)
+
+
 def _tee_output_to_file_local(result: subprocess.CompletedProcess, log_file: str) -> None:
     """Write stdout and stderr to log_file (tee-like behavior)."""
     with open(log_file, "w") as f:
@@ -90,7 +110,7 @@ def _run_conda_command_local(
 ) -> subprocess.CompletedProcess:
     """Run a conda command locally (no Prefect). Same behavior as prefect_flows.run_conda_command."""
     cmd = ["micromamba", "run", "-n", conda_env] + argv
-    _log.info("Running: %s (cwd=%s)", " ".join(cmd), working_dir)
+    _announce_command("DIALS", cmd, working_dir, _log)
     result = subprocess.run(
         cmd,
         cwd=working_dir,
@@ -123,9 +143,7 @@ def _run_mdx2_cli_command_local(
         "micromamba", "run", "-n", conda_env,
         "python", "-m", f"mdx2.command_line.{command}",
     ] + args
-    _log.info("Running command: %s", " ".join(cmd))
-    if working_dir:
-        _log.info("Working directory: %s", working_dir)
+    _announce_command("MDX2", cmd, working_dir, _log)
     result = subprocess.run(
         cmd,
         cwd=working_dir,
@@ -199,8 +217,8 @@ def _create_processed_dirs(raw_path: Path, processed_path: Path) -> List[Path]:
 def _populate_deployment_images(deployment_file: str) -> dict:
     """
     Populate deployment.json with paths discovered from raw HDF5 masters:
-    - background_files: list of *_bg_*master.h5 relative to raw_data_dir
-    - crystal_files: list of non-bg *_master.h5 relative to raw_data_dir
+    - background_files: dataset->list mapping of *_bg_*master.h5 relative to raw_data_dir
+    - crystal_files: dataset->list mapping of non-bg *_master.h5 relative to raw_data_dir
 
     Returns the updated config dict. Call before validation so empty values can be filled.
     """
@@ -233,8 +251,8 @@ def _populate_deployment_images(deployment_file: str) -> dict:
     bg_files = [rel(p) for p in bg_abs]
     crystal_files = [rel(p) for p in data_abs]
 
-    config["background_files"] = bg_files
-    config["crystal_files"] = crystal_files
+    config["background_files"] = _group_files_by_dataset(bg_files)
+    config["crystal_files"] = _group_files_by_dataset(crystal_files)
 
     with open(dep_path, "w") as f:
         json.dump(config, f, indent=2)
@@ -306,69 +324,140 @@ def load_single_crystal_config_from_file(path: Path) -> Tuple[Dict[str, Any], Pa
     return {k: v for k, v in data.items() if k in CONFIG_KEYS}, path
 
 
+def _dataset_group_key(file_path: str) -> str:
+    """Infer dataset key for grouping runs (e.g. insulin_1, insulin_2)."""
+    p = Path(file_path)
+    if len(p.parts) >= 2:
+        return p.parts[0]
+    name = p.name
+    if "_bg_" in name:
+        return name.split("_bg_", 1)[0]
+    stem = p.stem.replace("_master", "")
+    parts = stem.split("_")
+    if len(parts) >= 3 and parts[-1].isdigit():
+        return "_".join(parts[:-1])
+    return stem
+
+
+def _group_files_by_dataset(files: List[str]) -> Dict[str, List[str]]:
+    grouped: Dict[str, List[str]] = {}
+    for f in files:
+        grouped.setdefault(_dataset_group_key(f), []).append(f)
+    return grouped
+
+
+def _normalize_dataset_files(files: Any, field_name: str) -> Dict[str, List[str]]:
+    """Normalize crystal/background file config into {dataset: [paths...]}."""
+    if files is None:
+        return {}
+    if isinstance(files, str):
+        return _group_files_by_dataset([files])
+    if isinstance(files, list):
+        return _group_files_by_dataset([str(x) for x in files if x])
+    if isinstance(files, dict):
+        normalized: Dict[str, List[str]] = {}
+        for dataset, values in files.items():
+            key = str(dataset)
+            if isinstance(values, str):
+                entries = [values]
+            elif isinstance(values, list):
+                entries = [str(x) for x in values if x]
+            else:
+                raise ValueError(
+                    f"{field_name}[{key!r}] must be a string or list of strings, got {type(values).__name__}"
+                )
+            if entries:
+                normalized[key] = entries
+        return normalized
+    raise ValueError(f"{field_name} must be a dict/list/string, got {type(files).__name__}")
+
+
 # Pipeline step tasks (each step is a task with persist_result=True for result storage)
 # Only defined when Prefect is available
 if PREFECT_AVAILABLE:
+    def _run_prefect_dials_command(
+        argv: list,
+        working_dir: Optional[str],
+        log_file: Optional[str] = None,
+    ):
+        logger = get_run_logger()
+        cmd = ["micromamba", "run", "-n", "mdx2-dev"] + argv
+        _announce_command("DIALS", cmd, working_dir, logger)
+        return run_conda_command(argv, working_dir=working_dir, log_file=log_file)
+
+    def _run_prefect_mdx2_command(
+        command: str,
+        args: list,
+        working_dir: Optional[str],
+        log_file: Optional[str] = None,
+    ):
+        logger = get_run_logger()
+        cmd = [
+            "micromamba", "run", "-n", "mdx2-dev",
+            "python", "-m", f"mdx2.command_line.{command}",
+        ] + args
+        _announce_command("MDX2", cmd, working_dir, logger)
+        return run_mdx2_cli_command(command, args, working_dir=working_dir, log_file=log_file)
 
     @task(persist_result=True, name="dials-import")
     def task_dials_import(argv: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_conda_command(argv, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_dials_command(argv, working_dir, log_file)
 
     @task(persist_result=True, name="dials-find-spots")
     def task_dials_find_spots(argv: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_conda_command(argv, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_dials_command(argv, working_dir, log_file)
 
     @task(persist_result=True, name="dials-index")
     def task_dials_index(argv: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_conda_command(argv, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_dials_command(argv, working_dir, log_file)
 
     @task(persist_result=True, name="dials-refine")
     def task_dials_refine(argv: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_conda_command(argv, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_dials_command(argv, working_dir, log_file)
 
     @task(persist_result=True, name="dials-import-background")
     def task_dials_import_background(argv: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_conda_command(argv, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_dials_command(argv, working_dir, log_file)
 
     @task(persist_result=True, name="mdx2-import-data")
     def task_mdx2_import_data(command: str, args: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_mdx2_cli_command(command, args, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_mdx2_command(command, args, working_dir, log_file)
 
     @task(persist_result=True, name="mdx2-import-geometry")
     def task_mdx2_import_geometry(command: str, args: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_mdx2_cli_command(command, args, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_mdx2_command(command, args, working_dir, log_file)
 
     @task(persist_result=True, name="mdx2-find-peaks")
     def task_mdx2_find_peaks(command: str, args: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_mdx2_cli_command(command, args, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_mdx2_command(command, args, working_dir, log_file)
 
     @task(persist_result=True, name="mdx2-mask-peaks")
     def task_mdx2_mask_peaks(command: str, args: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_mdx2_cli_command(command, args, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_mdx2_command(command, args, working_dir, log_file)
 
     @task(persist_result=True, name="mdx2-bin-image-series")
     def task_mdx2_bin_image_series(command: str, args: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_mdx2_cli_command(command, args, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_mdx2_command(command, args, working_dir, log_file)
 
     @task(persist_result=True, name="mdx2-integrate")
     def task_mdx2_integrate(command: str, args: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_mdx2_cli_command(command, args, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_mdx2_command(command, args, working_dir, log_file)
 
     @task(persist_result=True, name="mdx2-correct")
     def task_mdx2_correct(command: str, args: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_mdx2_cli_command(command, args, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_mdx2_command(command, args, working_dir, log_file)
 
     @task(persist_result=True, name="mdx2-scale")
     def task_mdx2_scale(command: str, args: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_mdx2_cli_command(command, args, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_mdx2_command(command, args, working_dir, log_file)
 
     @task(persist_result=True, name="mdx2-merge")
     def task_mdx2_merge(command: str, args: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_mdx2_cli_command(command, args, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_mdx2_command(command, args, working_dir, log_file)
 
     @task(persist_result=True, name="mdx2-map")
     def task_mdx2_map(command: str, args: list, working_dir: Optional[str], log_file: Optional[str] = None):
-        return run_mdx2_cli_command(command, args, working_dir=working_dir, log_file=log_file)
+        return _run_prefect_mdx2_command(command, args, working_dir, log_file)
 
     @flow(name="single-crystal-workflow", log_prints=True)
     def single_crystal_workflow(
@@ -378,18 +467,19 @@ if PREFECT_AVAILABLE:
         raw_dir: str = "raw_data",
         processed_dir: str = "processed_data",
         run_dials: bool = True,
-        crystal_files: Optional[List[str]] = None,
-        background_files: Optional[List[str]] = None,
+        crystal_files: Optional[Any] = None,
+        background_files: Optional[Any] = None,
         space_group: int = 199,
         refined_expt: str = "refined.expt",
         background_expt: str = "background.expt",
-        integrate_subdivide: str = "4 4 4",
+        integrate_subdivide: str = "2 2 2",
         count_threshold: int = 20,
         sigma_cutoff: int = 3,
         nproc: int = 1,
         datastore: str = "datastore",
         datastore_bg: str = "datastore_bg",
         mca2020: bool = False,
+        batch_child: bool = False,
     ) -> list:
         """
         Run the single-crystal workflow: DIALS then mdx2.
@@ -450,38 +540,93 @@ if PREFECT_AVAILABLE:
                 background_files = populated.get("background_files") or background_files
             except Exception as e:
                 logger.warning("populate_deployment_images failed: %s", e)
-        # Normalize to list (config may have string for single path)
-        def _ensure_list(x): return [x] if isinstance(x, str) else (x or [])
-        crystal_files = _ensure_list(crystal_files)
-        background_files = _ensure_list(background_files)
+        crystal_by_dataset = _normalize_dataset_files(crystal_files, "crystal_files")
+        background_by_dataset = _normalize_dataset_files(background_files, "background_files")
         if run_dials:
-            if not crystal_files:
+            if not crystal_by_dataset:
                 raise ValueError(
                     "crystal_files must be set when run_dials is true. "
                     "Either add crystal_files to deployment.json (e.g. [\"images/insulin_2_1\"]), "
                     "or ensure raw_data_dir exists and contains *_master.h5 for populate_deployment_images to discover."
                 )
-            if not background_files:
+            if not background_by_dataset:
                 raise ValueError(
                     "background_files must be set when run_dials is true. "
                     "Either add background_files to deployment.json (e.g. [\"images/insulin_2_bkg\"]), "
                     "or ensure raw_data_dir exists and contains *_bg_*master.h5 for populate_deployment_images to discover."
                 )
+            # If config includes multiple datasets (e.g. insulin_1/* and insulin_2/*), run each dataset in its own subdir.
+            if not batch_child and len(crystal_by_dataset) > 1:
+                base_wd = (Path(working_dir) if working_dir else Path.cwd()).resolve()
+                batch_results = []
+                logger.info(
+                    "Detected multiple datasets in crystal_files (%s). Running sequentially per dataset.",
+                    ", ".join(sorted(crystal_by_dataset.keys())),
+                )
+                for dataset in sorted(crystal_by_dataset.keys()):
+                    ds_crystals = crystal_by_dataset[dataset]
+                    ds_backgrounds = background_by_dataset.get(dataset, [])
+                    if not ds_backgrounds:
+                        raise ValueError(
+                            f"No background_files found for dataset '{dataset}'. "
+                            "Provide matching background files for each dataset."
+                        )
+                    ds_wd = base_wd / dataset
+                    ds_wd.mkdir(parents=True, exist_ok=True)
+                    logger.info(
+                        "Running dataset '%s' in %s using crystal=%s background=%s",
+                        dataset, ds_wd, ds_crystals[0], ds_backgrounds[0]
+                    )
+                    batch_results.append(
+                        single_crystal_workflow(
+                            working_dir=str(ds_wd),
+                            raw_data_dir=raw_data_dir,
+                            config_file=None,
+                            raw_dir=raw_dir,
+                            processed_dir=processed_dir,
+                            run_dials=run_dials,
+                            crystal_files={dataset: ds_crystals},
+                            background_files={dataset: ds_backgrounds},
+                            space_group=space_group,
+                            refined_expt=refined_expt,
+                            background_expt=background_expt,
+                            integrate_subdivide=integrate_subdivide,
+                            count_threshold=count_threshold,
+                            sigma_cutoff=sigma_cutoff,
+                            nproc=nproc,
+                            datastore=datastore,
+                            datastore_bg=datastore_bg,
+                            mca2020=mca2020,
+                            batch_child=True,
+                        )
+                    )
+                logger.info("Finished batched single-crystal workflow for all datasets.")
+                return batch_results
 
         wd = working_dir
         base = Path(working_dir) if working_dir else Path.cwd()
         raw_base = Path(raw_data_dir).resolve() if raw_data_dir else base
 
-        # Run directory_setup first when raw_data_dir points to a raw_data-style folder.
-        # Use project root (search_dir.parent.parent for processed_data/<crystal>/ layout) so we create
-        # raw_data/ and processed_data/ in the writable project tree, not in resolved symlink targets (e.g. /mnt/chess).
+        # Run directory setup only when expected project folders already exist.
+        # This prevents accidental creation of new raw_data/processed_data trees in the wrong location.
         if raw_data_dir:
             setup_base = search_dir.parent.parent
-            _directory_setup(
-                raw_dir=raw_dir,
-                processed_dir=processed_dir,
-                working_dir=str(setup_base),
-            )
+            raw_path = setup_base / raw_dir
+            processed_path = setup_base / processed_dir
+            if raw_path.is_dir() and processed_path.is_dir():
+                _directory_setup(
+                    raw_dir=raw_dir,
+                    processed_dir=processed_dir,
+                    working_dir=str(setup_base),
+                )
+            else:
+                logger.info(
+                    "Skipping directory setup because required folders are missing: raw=%s exists=%s, processed=%s exists=%s",
+                    raw_path,
+                    raw_path.is_dir(),
+                    processed_path,
+                    processed_path.is_dir(),
+                )
 
         if not run_dials:
             if not (raw_base / refined_expt).exists():
@@ -511,8 +656,9 @@ if PREFECT_AVAILABLE:
 
         if run_dials:
             logger.info("Running DIALS: import → find_spots → index → refine, then background import")
-            crystal_path = str((raw_base / crystal_files[0]).resolve())
-            background_path_in = str((raw_base / background_files[0]).resolve())
+            dataset = sorted(crystal_by_dataset.keys())[0]
+            crystal_path = str((raw_base / crystal_by_dataset[dataset][0]).resolve())
+            background_path_in = str((raw_base / background_by_dataset[dataset][0]).resolve())
             # 1. dials.import crystal images → imported.expt
             results.append(task_dials_import(
                 ["dials.import", crystal_path], dials_wd,
@@ -667,18 +813,19 @@ def single_crystal_workflow_local(
     raw_dir: str = "raw_data",
     processed_dir: str = "processed_data",
     run_dials: bool = True,
-    crystal_files: Optional[List[str]] = None,
-    background_files: Optional[List[str]] = None,
+    crystal_files: Optional[Any] = None,
+    background_files: Optional[Any] = None,
     space_group: int = 199,
     refined_expt: str = "refined.expt",
     background_expt: str = "background.expt",
-    integrate_subdivide: str = "4 4 4",
+    integrate_subdivide: str = "2 2 2",
     count_threshold: int = 20,
     sigma_cutoff: int = 3,
     nproc: int = 1,
     datastore: str = "datastore",
     datastore_bg: str = "datastore_bg",
     mca2020: bool = False,
+    batch_child: bool = False,
 ) -> list:
     """
     Run the single-crystal workflow locally without Prefect.
@@ -724,34 +871,88 @@ def single_crystal_workflow_local(
             background_files = populated.get("background_files") or background_files
         except Exception as e:
             _log.warning("populate_deployment_images failed: %s", e)
-    def _ensure_list(x): return [x] if isinstance(x, str) else (x or [])
-    crystal_files = _ensure_list(crystal_files)
-    background_files = _ensure_list(background_files)
+    crystal_by_dataset = _normalize_dataset_files(crystal_files, "crystal_files")
+    background_by_dataset = _normalize_dataset_files(background_files, "background_files")
     if run_dials:
-        if not crystal_files:
+        if not crystal_by_dataset:
             raise ValueError(
                 "crystal_files must be set when run_dials is true. "
                 "Either add crystal_files to deployment.json (e.g. [\"images/insulin_2_1\"]), "
                 "or ensure raw_data_dir exists and contains *_master.h5 for populate_deployment_images to discover."
             )
-        if not background_files:
+        if not background_by_dataset:
             raise ValueError(
                 "background_files must be set when run_dials is true. "
                 "Either add background_files to deployment.json (e.g. [\"images/insulin_2_bkg\"]), "
                 "or ensure raw_data_dir exists and contains *_bg_*master.h5 for populate_deployment_images to discover."
             )
+        if not batch_child and len(crystal_by_dataset) > 1:
+            base_wd = (Path(working_dir) if working_dir else Path.cwd()).resolve()
+            batch_results = []
+            _log.info(
+                "Detected multiple datasets in crystal_files (%s). Running sequentially per dataset.",
+                ", ".join(sorted(crystal_by_dataset.keys())),
+            )
+            for dataset in sorted(crystal_by_dataset.keys()):
+                ds_crystals = crystal_by_dataset[dataset]
+                ds_backgrounds = background_by_dataset.get(dataset, [])
+                if not ds_backgrounds:
+                    raise ValueError(
+                        f"No background_files found for dataset '{dataset}'. "
+                        "Provide matching background files for each dataset."
+                    )
+                ds_wd = base_wd / dataset
+                ds_wd.mkdir(parents=True, exist_ok=True)
+                _log.info(
+                    "Running dataset '%s' in %s using crystal=%s background=%s",
+                    dataset, ds_wd, ds_crystals[0], ds_backgrounds[0]
+                )
+                batch_results.append(
+                    single_crystal_workflow_local(
+                        working_dir=str(ds_wd),
+                        raw_data_dir=raw_data_dir,
+                        config_file=None,
+                        raw_dir=raw_dir,
+                        processed_dir=processed_dir,
+                        run_dials=run_dials,
+                        crystal_files={dataset: ds_crystals},
+                        background_files={dataset: ds_backgrounds},
+                        space_group=space_group,
+                        refined_expt=refined_expt,
+                        background_expt=background_expt,
+                        integrate_subdivide=integrate_subdivide,
+                        count_threshold=count_threshold,
+                        sigma_cutoff=sigma_cutoff,
+                        nproc=nproc,
+                        datastore=datastore,
+                        datastore_bg=datastore_bg,
+                        mca2020=mca2020,
+                        batch_child=True,
+                    )
+                )
+            _log.info("Finished batched single-crystal workflow for all datasets.")
+            return batch_results
 
     wd = working_dir
     base = Path(working_dir) if working_dir else Path.cwd()
     raw_base = Path(raw_data_dir).resolve() if raw_data_dir else base
 
-    # Run directory setup first when raw_data_dir points to a raw_data-style folder.
-    # Use project root (search_dir.parent.parent) so we use writable raw_data/processed_data, not resolved symlink targets.
+    # Run directory setup only when expected project folders already exist.
+    # This prevents accidental creation of new raw_data/processed_data trees in the wrong location.
     if raw_data_dir:
         setup_base = search_dir.parent.parent
         raw_path = setup_base / raw_dir
         processed_path = setup_base / processed_dir
-        _create_processed_dirs(raw_path, processed_path)
+        if raw_path.is_dir() and processed_path.is_dir():
+            _create_processed_dirs(raw_path, processed_path)
+        else:
+            _log.info(
+                "Skipping directory setup because required folders are missing: raw=%s exists=%s, processed=%s exists=%s",
+                raw_path,
+                raw_path.is_dir(),
+                processed_path,
+                processed_path.is_dir(),
+            )
 
     if not run_dials:
         if not (raw_base / refined_expt).exists():
@@ -783,8 +984,9 @@ def single_crystal_workflow_local(
         return _run_mdx2_cli_command_local(cmd, args, working_dir=cwd, log_file=log_file)
 
     if run_dials:
-        crystal_path = str((raw_base / crystal_files[0]).resolve())
-        background_path_in = str((raw_base / background_files[0]).resolve())
+        dataset = sorted(crystal_by_dataset.keys())[0]
+        crystal_path = str((raw_base / crystal_by_dataset[dataset][0]).resolve())
+        background_path_in = str((raw_base / background_by_dataset[dataset][0]).resolve())
         _log.info("Running DIALS: import → find_spots → index → refine, then background import")
         results.append(run_conda(["dials.import", crystal_path], dials_wd, str(wd_path / "01_dials_import.log")))
         results.append(run_conda(["dials.find_spots", "imported.expt"], dials_wd, str(wd_path / "02_dials_find_spots.log")))
