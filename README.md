@@ -44,7 +44,7 @@ Publications describing [ando-lab/mdx2](https://github.com/ando-lab/mdx2):
 
 ### Prerequisites
 
-For a conda-based installation, you'll need [micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) or equivalent.
+For a conda-based installation, you'll need [micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) or equivalent. The Docker-based installed requires you to install and login to [Docker](https://www.docker.com/get-started/).
 
 ### User install (conda environment)
 
@@ -71,3 +71,23 @@ pip install -e ".[dev]"
 ```
 
 The last line installs mdx2 in editable mode, with optional development tools including pytest and ruff
+
+### Developer Install (Docker container)
+
+Pull image from Docker Hub and run the container. Search the Docker container logs for the localhost address to access mdx2 within a Jupyter Lab notebook or terminal.
+  a. Exposes ports 8880-8890
+  b. Platform supported: linux/amd64
+```bash
+git clone https://github.com/diff-use/mdx2.git && \
+cd mdx2 && \
+docker pull diffuseproject/mdx2:1.0.0 && \
+docker run --platform linux/amd64 --name 'mdx2_container' -it --rm -e JUPYTER_PORT={CONTAINER_PORT} -p {HOST_PORT}:{CONTAINER_PORT} -v "$(pwd)":/ home/dev diffuseproject/mdx2:latest && \
+docker logs 'mdx2_container'
+```
+
+(Optional) Open a shell in the running container:
+```bash
+docker exec -it 'mdx2_container' /bin/bash && \
+eval "$(micromamba shell hook --shell bash)" && \
+micromamba activate 'mdx2-dev'
+```
