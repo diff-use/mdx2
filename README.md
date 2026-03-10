@@ -87,7 +87,7 @@ docker logs 'mdx2_container'
 
 (Optional) Open a shell in the running container:
 ```bash
-docker exec -it 'mdx2_container' /bin/bash && \
-eval "$(micromamba shell hook --shell bash)" && \
+docker exec -it 'mdx2_container' /bin/bash
+eval "$(micromamba shell hook --shell bash)"
 micromamba activate 'mdx2-dev'
 ```
