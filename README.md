@@ -81,7 +81,7 @@ Pull image from Docker Hub and run the container. Search the Docker container lo
 git clone https://github.com/diff-use/mdx2.git && \
 cd mdx2 && \
 docker pull diffuseproject/mdx2:1.0.0 && \
-docker run --platform linux/amd64 --name 'mdx2_container' -it --rm -e JUPYTER_PORT={CONTAINER_PORT} -p {HOST_PORT}:{CONTAINER_PORT} -v "$(pwd)":/ home/dev diffuseproject/mdx2:latest && \
+docker run --platform linux/amd64 --name 'mdx2_container' -it --rm -e JUPYTER_PORT={CONTAINER_PORT} -p {HOST_PORT}:{CONTAINER_PORT} -v "$(pwd)":/home/dev diffuseproject/mdx2:latest && \
 docker logs 'mdx2_container'
 ```
 
