@@ -1,15 +1,12 @@
 # diffuseproject/mdx2:1.0.0 (https://hub.docker.com/repository/docker/diffuseproject/mdx2/tags/1.0.0/sha256-abfcf7d2feacdf9a207a13c2bb908d62e6f461259f78e82d3bb8983267446291)
 
-FROM python:3.10-slim AS stage1
+FROM mambaorg/micromamba:1.5.5 AS micromamba_stage
 
-FROM mambaorg/micromamba:1.5.5 AS stage2
-
-FROM debian:stable-slim AS final
+FROM python:3.10-slim AS final
 
 RUN apt-get update && apt-get install -y ca-certificates git
 
-COPY --from=stage1 /usr/local /usr/local
-COPY --from=stage2 /bin/micromamba /usr/local/bin/micromamba
+COPY --from=micromamba_stage /bin/micromamba /usr/local/bin/micromamba
 
 ENV PATH="/usr/local/bin:/opt/conda/bin:$PATH"
 ENV JUPYTER_PORT=8888
