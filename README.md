@@ -76,7 +76,7 @@ The last line installs mdx2 in editable mode, with optional development tools in
 
 Pull image from Docker Hub and run the container. Search the Docker container logs for the localhost address to access mdx2 within a Jupyter Lab notebook or terminal.
 
-- Exposes ports 8880-8890
+- Docker image exposes ports 8880-8890 (default: 8888)
 - Platform: linux/amd64
 ```bash
 git clone https://github.com/diff-use/mdx2.git
