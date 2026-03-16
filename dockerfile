@@ -1,0 +1,37 @@
+FROM python:3.10-slim AS stage1
+
+FROM mambaorg/micromamba:1.5.5 AS stage2
+
+FROM debian:stable-slim AS final
+
+RUN apt-get update && apt-get install -y ca-certificates
+
+COPY --from=stage1 /usr/local /usr/local
+COPY --from=stage2 /bin/micromamba /usr/local/bin/micromamba
+
+ENV MAMBA_ROOT_PREFIX="/root/micromamba" \
+    CONDA_PREFIX="/root/micromamba/envs/mdx2-dev" \
+    PATH="/root/micromamba/envs/mdx2-dev/bin:/usr/local/bin:/opt/conda/bin:$PATH"
+
+# Ensure /opt/conda exists for micromamba to use
+RUN mkdir -p /opt/conda
+
+WORKDIR /home/dev
+
+COPY env.yaml .
+
+# Use micromamba to create the environment and install packages
+RUN --mount=type=cache,target=/root/micromamba/pkgs \
+    /usr/local/bin/micromamba create -f env.yaml -n mdx2-dev && \
+    /usr/local/bin/micromamba install -y -n mdx2-dev nexpy jupyterlab jupyterlab-h5web dials xia2 wget tar -c conda-forge
+
+COPY . .
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    /usr/local/bin/micromamba run -n mdx2-dev pip install -e . && \
+    /usr/local/bin/micromamba run -n mdx2-dev pip install jupyterhub jupyter-vscode-proxy
+
+EXPOSE 8888
+
+CMD ["/usr/local/bin/micromamba", "run", "-n", "mdx2-dev", "jupyterhub-singleuser"]
+
