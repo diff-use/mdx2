@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - jlee-docker
+  pull_request:
 
 jobs:
   docker:
@@ -35,7 +35,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: .github/Dockerfile
+          file: dockerfile
           push: ${{ github.ref == 'refs/heads/main' }}
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
