@@ -7,7 +7,6 @@ import xarray as xr
 from mdx2.data import HKLTable
 
 
-# TODO: return a generator instead of a dict?
 def unique_slices(symmetry, offset=0.5):
     """
     Determine the unique slice directions according to symmetry.
