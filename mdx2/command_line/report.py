@@ -62,8 +62,7 @@ class VisualizationParameters(ExecutableNotebook):
 
     _template_name = "visualization"
 
-    merged_file: str  # NeXus file containing the merged hkl_table
-    geometry_file: str  # NeXus file containing symmetry and crystal
+    input_files: list[str]  # list of input file paths, required
     cartesian_coordinates: bool = (
         True  # whether to plot the slices in cartesian coordinates (sx, sy) or Miller indices (h, k, l).
     )
@@ -76,10 +75,6 @@ class ScalingModelParameters(ExecutableNotebook):
     _template_name = "scaling_model"
 
     input_files: list[str]  # list of input file paths, required
-    model_names: Optional[list[str]] = (
-        None  # optional list of model names, overriding defaults defined in scaling_model.ipynb
-    )
-    shared_detector_model: Optional[bool] = None  # set to False to show separate detector models for each input file.
 
 
 @dataclass
