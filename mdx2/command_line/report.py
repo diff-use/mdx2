@@ -192,6 +192,10 @@ class Parameters:
 
     metadata: Metadata = Metadata()  # metadata fields that can be overridden on the CLI
 
+    output_path: Optional[str] = (
+        None  # optional path to save the executed notebook to. If None, the template name us used with .ipynb extension
+    )
+
     def __post_init__(self):
         # if the user provided input files at the top level, pass these to the template
         # to update sources that were not explicitly set by the user.
@@ -201,7 +205,10 @@ class Parameters:
 
 def run_report(params):
     """main function to run the report generation"""
-    params.template.execute(metadata=asdict(params.metadata))
+    params.template.execute(
+        metadata=asdict(params.metadata),
+        output_path=params.output_path,
+    )
 
 
 # NOTE: parse_arguments is imported by the testing framework

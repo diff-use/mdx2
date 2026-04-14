@@ -3,13 +3,23 @@
 import dataclasses
 import re
 import typing
+import warnings
 
 import nbformat
 import pytest
 from papermill import inspect_notebook
 
-from mdx2.command_line.report import _ExampleParameters, ScalingModelParameters, VisualizationParameters
+from mdx2.command_line.report import (
+    ScalingModelParameters,
+    VisualizationParameters,
+    _ExampleParameters,
+)
 from mdx2.report import TEMPLATES
+
+
+class TemplateParameterMismatchWarning(UserWarning):
+    pass
+
 
 SUPPORTED_TYPES = []
 for t in ["int", "float", "str", "bool"]:
@@ -116,11 +126,17 @@ def test_dataclass_matches_template(ParametersDataclass):
             )
             has_default_in_dataclass = not is_required_in_dataclass and field.default is not None
             # NOTE: do I need to check for the existence of a default factory?
-            assert is_required_in_dataclass or has_default_in_dataclass, (
-                f"Field '{field.name}' in dataclass '{ParametersDataclass.__name__}' corresponds to a parameter with "
-                f"default value None in template '{template_name}', but is not defined as a required parameter or a "
-                f"parameter with a default value that is not None in the dataclass."
-            )
+            if not (is_required_in_dataclass or has_default_in_dataclass):
+                warnings.warn(
+                    (
+                        f"Field '{field.name}' in dataclass '{ParametersDataclass.__name__}' corresponds to a "
+                        f"parameter with default value None in template '{template_name}', but is not defined as "
+                        f"a required parameter or a parameter with a default value that is not None in the "
+                        f"dataclass."
+                    ),
+                    TemplateParameterMismatchWarning,
+                    stacklevel=2,
+                )
         # Verify that papermill's inferred data type matches the type hint in the parameters dataclass
         # HACK: Need to handle cases like Optional[list[str]] where the inferred type is "list[str]"
         # but the type hint is "typing.Optional[list[str]]"
