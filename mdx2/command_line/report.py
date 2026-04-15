@@ -183,6 +183,7 @@ class ScalingModelParameters(ExecutableNotebook):
 class Parameters:
     """parameters for the report generation"""
 
+    # Input nexus files. Will be inspected for object sources, and passed to the template
     input_files: list[str] = field(positional=True, nargs="*", default_factory=list)
 
     template: ExecutableNotebook = subgroups(
@@ -192,9 +193,8 @@ class Parameters:
 
     metadata: Metadata = Metadata()  # metadata fields that can be overridden on the CLI
 
-    output_path: Optional[str] = (
-        None  # optional path to save the executed notebook to. If None, the template name us used with .ipynb extension
-    )
+    # optional path to save the executed notebook to. If None, the template name us used with .ipynb extension
+    output_path: Optional[str] = field(alias=["-o"], default=None)
 
     def __post_init__(self):
         # if the user provided input files at the top level, pass these to the template
