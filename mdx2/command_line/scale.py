@@ -27,6 +27,7 @@ class PrescaleParameters:
     offset: bool = False  # include offset model in pre-scaling refinement if offset.enable is True
     detector: bool = False  # include detector model in pre-scaling refinement if detector.enable is True
     absorption: bool = True  # include absorption model in pre-scaling refinement if absorption.enable is True
+    nproc: int = 1  # number of parallel processes (or 1 for sequential, -1 for all CPUs, -N for all but N+1)
 
 
 @dataclass
@@ -318,6 +319,9 @@ def run_scale(params):
     S = load_data_for_scaling(*params.hkl)
 
     MR = BatchModelRefiner(S)
+
+    if params.nproc != 1:
+        logger.info("Warning: serial execution only, ignoring nproc value")
 
     if params.scaling.enable:
         MR.add_scaling_models(
