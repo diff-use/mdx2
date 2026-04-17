@@ -5,6 +5,7 @@ import pandas as pd
 import xarray as xr
 
 from mdx2.data import HKLTable
+from mdx2.report._stats import _calc_isoavg
 
 
 def unique_slices(symmetry, offset=0.5):
@@ -20,16 +21,16 @@ def unique_slices(symmetry, offset=0.5):
     k0 = k0.reshape((3, 3, 3))
     l0 = l0.reshape((3, 3, 3))
 
-    unique_slices = {}
+    seen_slices = {}
     for axis in [2, 1, 0]:
         for index, coord in enumerate([0, 1, -1]):
             h0j = h0.take(indices=index, axis=axis).ravel()
             k0j = k0.take(indices=index, axis=axis).ravel()
             l0j = l0.take(indices=index, axis=axis).ravel()
-            unique_hkl0j = tuple(sorted(set((x, y, z) for x, y, z in zip(h0j, k0j, l0j))))
+            unique_hkl0j = tuple(sorted(set(zip(h0j, k0j, l0j))))
             # check if t0j is already in unique_slices, if not, add it:
-            if unique_hkl0j not in unique_slices:
-                unique_slices[unique_hkl0j] = (axis, coord)
+            if unique_hkl0j not in seen_slices:
+                seen_slices[unique_hkl0j] = (axis, coord)
                 yield axis, coord * offset
 
 
@@ -88,24 +89,6 @@ def _get_cartesian_coordinates(h, k, l, crystal, slice_index):
     return sxyz[0, ...], sxyz[1, ...], sxyz[2, ...]
 
 
-def _trim(series: "pd.Series", fraction: float = 0.25) -> "pd.Series[bool]":
-    """
-    Return a boolean mask (same index) that is True except at the indices
-    of the N smallest and N largest values of `series`.
-    """
-    n = int(np.round(fraction * series.size))
-    if n <= 0 or series.size < 20:  # if there are too few points, don't trim anything
-        return pd.Series(True, index=series.index, dtype=bool)
-
-    small_idx = series.nsmallest(n).index
-    large_idx = series.nlargest(n).index
-
-    mask = pd.Series(True, index=series.index, dtype=bool)
-    mask.loc[small_idx] = False
-    mask.loc[large_idx] = False
-    return mask
-
-
 def calc_isoavg(hkl_table, crystal, bin_width=0.01, trim_fraction=0.1):
     UB = crystal.ub_matrix
     s = UB @ np.stack((hkl_table.h, hkl_table.k, hkl_table.l))
@@ -114,49 +97,7 @@ def calc_isoavg(hkl_table, crystal, bin_width=0.01, trim_fraction=0.1):
     bin_edges = np.linspace(0, smax, int(smax / bin_width) + 1)
 
     df = pd.DataFrame({"s": s, "intensity": hkl_table.intensity, "intensity_error": hkl_table.intensity_error})
-    df.dropna(subset=["intensity"], inplace=True)
-    s_bins = pd.cut(df["s"], bins=bin_edges)
-
-    df["mask"] = df.groupby(s_bins)["intensity"].transform(lambda x: _trim(x, fraction=trim_fraction))
-    df.dropna(subset=["mask"], inplace=True)
-
-    df_isoavg = (
-        df[df["mask"]]
-        .groupby(s_bins)
-        .agg(
-            {
-                "s": ["mean", "count"],
-                "intensity": ["mean", "std"],
-                "intensity_error": "mean",
-            }
-        )
-        .set_index(("s", "mean"))
-    )
-    df_isoavg["ioversigma"] = df_isoavg[("intensity", "mean")] / df_isoavg[("intensity_error", "mean")]
-
-    # first, drop any rows with NaN values in the index (i.e. ("s", "count") == 0)
-    df_isoavg = df_isoavg[df_isoavg[("s", "count")] != 0]
-
-    # apply some sane filters.
-    # if count < 10, or intensity/intensity_error < 1, set intensity to NaN
-    df_isoavg.loc[df_isoavg[("s", "count")] < 10, ("intensity", "mean")] = np.nan
-    df_isoavg.loc[df_isoavg["ioversigma"] < 1, ("intensity", "mean")] = np.nan
-
-    # add rows for s=0 and s=smax, with intensity = np.nan
-    df_isoavg.loc[0] = np.nan
-    df_isoavg.loc[smax] = np.nan
-
-    # sort by index
-    df_isoavg = df_isoavg.sort_index()
-
-    # fill the nans
-    df_isoavg[("intensity", "mean")] = df_isoavg[("intensity", "mean")].interpolate(method="nearest").ffill().bfill()
-
-    # get values to return as numpy arrays
-    s_values = df_isoavg.index.values
-    intensity_values = df_isoavg[("intensity", "mean")].values
-
-    return s_values, intensity_values
+    return _calc_isoavg(df, bin_edges=bin_edges, trim_fraction=trim_fraction)
 
 
 def _reorient_reciprocal_axes(UB, slice_index):

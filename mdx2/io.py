@@ -103,7 +103,6 @@ def saveobj(obj, filename, name=None, append=False, mode="w"):
     return nxsobj
 
 
-
 class NexusFileIndex:
     def __init__(self, *file_paths):
         self._object_index = {}
@@ -112,29 +111,35 @@ class NexusFileIndex:
             file_info = {}
             mdx2_object_info = {}
             try:
-                with h5py.File(filename, 'r') as f:
-                    file_info = {k:v for k, v in f.attrs.items()} # is this the best way to copy attrs into a dict?
-                    if 'mdx2_version' in file_info: # it's an mdx2 file, so look for mdx2 objects in the entry group
-                        for k, v in f['/entry'].items():
-                            mdx2_object_info[k] = {k:v for k, v in v.attrs.items()}
-                            mdx2_object_info[k]['keys'] = list(v.keys())
-            except Exception as e:
-                warnings.warn(f"Error inspecting file {filename}: {e}")
+                with h5py.File(filename, "r") as f:
+                    file_info = {k: v for k, v in f.attrs.items()}
+                    if "mdx2_version" in file_info:  # it's an mdx2 file, so look for mdx2 objects in the entry group
+                        for obj_name, obj in f["/entry"].items():
+                            mdx2_object_info[obj_name] = {ak: av for ak, av in obj.attrs.items()}
+                            mdx2_object_info[obj_name]["keys"] = list(obj.keys())
+            except (OSError, KeyError) as e:
+                warnings.warn(f"Error inspecting file {filename}: {e}", stacklevel=2)
             return file_info, mdx2_object_info
 
         for f in file_paths:
             file_info, mdx2_object_info = _inspect_nexus_file(f)
-            if 'mdx2_version' not in file_info:
-                warnings.warn(f"File {f} does not appear to be an mdx2 file (missing 'mdx2_version' attribute)")
+            if "mdx2_version" not in file_info:
+                warnings.warn(
+                    f"File {f} does not appear to be an mdx2 file (missing 'mdx2_version' attribute)",
+                    stacklevel=2,
+                )
             elif not mdx2_object_info:
-                warnings.warn(f"File {f} does not appear to contain any mdx2 objects in the /entry group")
+                warnings.warn(
+                    f"File {f} does not appear to contain any mdx2 objects in the /entry group",
+                    stacklevel=2,
+                )
             else:
                 self._object_index[f] = mdx2_object_info
-    
+
     def find_objects(self, mdx2_class: type):
         matches = []
         for file_name, object_info in self._object_index.items():
             for object_name, attrs in object_info.items():
-                if attrs.get('mdx2_class') == mdx2_class.__name__ and attrs.get('mdx2_module') == mdx2_class.__module__:
+                if attrs.get("mdx2_class") == mdx2_class.__name__ and attrs.get("mdx2_module") == mdx2_class.__module__:
                     matches.append((file_name, object_name))
         return matches

@@ -27,6 +27,24 @@ for t in ["int", "float", "str", "bool"]:
     SUPPORTED_TYPES.append(f"list[{t}]")
 
 
+def _canonical_type_name(type_hint):
+    if hasattr(type_hint, "__origin__") and type_hint.__origin__ is typing.Union:
+        non_none_types = [t for t in type_hint.__args__ if t is not type(None)]
+        if len(non_none_types) == 1:
+            type_hint = non_none_types[0]
+
+    origin = typing.get_origin(type_hint)
+    args = typing.get_args(type_hint)
+
+    if origin is list and len(args) == 1:
+        return f"list[{_canonical_type_name(args[0])}]"
+
+    if type_hint in (int, float, str, bool):
+        return type_hint.__name__
+
+    return str(type_hint).replace("typing.", "")
+
+
 @pytest.mark.parametrize("template_name, template_path", TEMPLATES.items())
 def test_template_exists(template_name, template_path):
     """Verify that the templates defined in mdx2.report.TEMPLATES actually exist"""
@@ -87,7 +105,7 @@ def test_template_parameters_valid(template_name, template_path):
             continue  # _metadata is a special case, it can be any dict. Also allow private parameters here.
         assert param["inferred_type_name"] in SUPPORTED_TYPES, (
             f"Template '{template_name}' at path {template_path} "
-            f"with unsupported type '{param['inferred_type_name']}'. "
+            f"parameter '{param['name']}' has unsupported type '{param['inferred_type_name']}'. "
             f"Supported types are: {SUPPORTED_TYPES}"
         )
 
@@ -141,17 +159,11 @@ def test_dataclass_matches_template(ParametersDataclass):
         # HACK: Need to handle cases like Optional[list[str]] where the inferred type is "list[str]"
         # but the type hint is "typing.Optional[list[str]]"
 
-        # first use a regex to extract the base type (e.g. "list[str]" from "typing.Optional[list[str]]"), and then
-        # check for an exact match with the inferred type.
-        type_hint = field.type
-        if hasattr(type_hint, "__origin__") and type_hint.__origin__ is typing.Union:
-            # this is a Union type, extract the non-None type if it's an Optional
-            non_none_types = [t for t in type_hint.__args__ if t is not type(None)]
-            if len(non_none_types) == 1:
-                type_hint = non_none_types[0]
+        inferred_type = template_param["inferred_type_name"]
+        expected_type = _canonical_type_name(field.type)
 
-        assert eval(template_param["inferred_type_name"]) == type_hint, (
+        assert inferred_type == expected_type, (
             f"Field '{field.name}' in dataclass '{ParametersDataclass.__name__}' has type hint '{field.type}', but "
-            f"papermill inferred type '{template_param['inferred_type_name']}' for the corresponding parameter in "
+            f"papermill inferred type '{inferred_type}' for the corresponding parameter in "
             f"template '{template_name}'. These should match to ensure that the CLI correctly parses parameters."
         )

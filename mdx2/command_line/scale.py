@@ -96,8 +96,8 @@ class Parameters:
     detector: DetectorModelParameters = field(default_factory=DetectorModelParameters)
     offset: OffsetModelParameters = field(default_factory=OffsetModelParameters)
     outfile: Optional[List[str]] = field(default=None, nargs="*")
-    nproc: int = 1  # number of parallel processes (or 1 for sequential, -1 for all CPUs, -N for all but N+1)
     """name of the output NeXus file(s). If omitted, will attempt a sensible name such as scales.nxs"""
+    nproc: int = 1  # number of parallel processes (or 1 for sequential, -1 for all CPUs, -N for all but N+1)
     mca2020: bool = False
     """shortcut for --scaling.enable True --offset.enable True --detector.enable True --absorption.enable True"""
 

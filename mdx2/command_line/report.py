@@ -2,7 +2,7 @@
 Generate jupyter notebook reports.
 """
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field as dataclass_field
 from typing import ClassVar, Optional
 
 # from simple_parsing.helpers.fields import subparsers
@@ -34,10 +34,9 @@ class Metadata:
 class ExecutableNotebook:
     """base class for executable notebooks."""
 
-    _template_name: ClassVar[str] = field(init=False)  # name of the notebook template to execute, set by subclasses
-    _input_source_mapping: ClassVar[dict] = field(
-        init=False
-    )  # name of the notebook template to execute, set by subclasses
+    _template_name: ClassVar[str]
+    # Mapping of source labels to auto-discovery rules, defined by subclasses.
+    _input_source_mapping: ClassVar[dict]
 
     def update_sources_from_input_files(self, *input_files):
         file_index = NexusFileIndex(*input_files)
@@ -233,7 +232,7 @@ class Parameters:
         default="visualization",
     )
 
-    metadata: Metadata = Metadata()  # metadata fields that can be overridden on the CLI
+    metadata: Metadata = dataclass_field(default_factory=Metadata)  # metadata fields that can be overridden on the CLI
 
     # optional path to save the executed notebook to. If None, the template name us used with .ipynb extension
     output_path: Optional[str] = field(alias=["-o"], default=None)
