@@ -134,6 +134,45 @@ class VisualizationParameters(ExecutableNotebook):
 
 
 @dataclass
+class MapStatisticsParameters(ExecutableNotebook):
+    """parameters for the map_statistics.ipynb template"""
+
+    _template_name = "map_statistics"
+    _input_source_mapping = {
+        "crystal": {
+            "object_type": Crystal,
+            "parameter_name": "crystal_source",
+            "multiple": False,
+            "required": True,
+        },
+        "symmetry": {
+            "object_type": Symmetry,
+            "parameter_name": "symmetry_source",
+            "multiple": False,
+            "required": True,
+        },
+        "hkl_table": {
+            "object_type": HKLTable,
+            "parameter_name": "hkl_table_source",
+            "multiple": False,
+            "required": True,
+        },
+    }
+
+    crystal_source: Optional[str] = (
+        None  # optional path encoded as a string nexus_file_path:object_name to load a crystal object
+    )
+    symmetry_source: Optional[str] = (
+        None  # optional path encoded as a string nexus_file_path:object_name to load a crystal object
+    )
+    hkl_table_source: Optional[str] = (
+        None  # optional path encoded as a string nexus_file_path:object_name to load a hkl table object
+    )
+
+    bin_width: float = 0.01  # bin width for statistics vs s
+
+
+@dataclass
 class ScalingModelParameters(ExecutableNotebook):
     """parameters for the scaling_model.ipynb template"""
 
@@ -187,7 +226,10 @@ class Parameters:
     input_files: list[str] = field(positional=True, nargs="*", default_factory=list)
 
     template: ExecutableNotebook = subgroups(
-        {p._template_name: p for p in [_ExampleParameters, ScalingModelParameters, VisualizationParameters]},
+        {
+            p._template_name: p
+            for p in [_ExampleParameters, ScalingModelParameters, VisualizationParameters, MapStatisticsParameters]
+        },
         default="visualization",
     )
 
