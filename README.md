@@ -21,6 +21,10 @@ Publications describing [ando-lab/mdx2](https://github.com/ando-lab/mdx2):
 
 ## Versions
 
+### Version 1.0.4
+
+- Added `mdx2.report` to automatically generate and execute ipython notebook reports from the command-line. Available templates: `visualization`, `scaling_model`, and `map_statistics`. For example outputs, see: [examples/insulin-multi-crystal/reports](examples/insulin-multi-crystal/reports) and [examples/insulin-tutorial/reports](examples/insulin-tutorial/reports).
+
 ### Version 1.0.3
 
 - Performance boost for `mdx2.import_data` using parallel read and write. The `data.nxs` file contains a virtual dataset linking to neXus files in a subdirectory (`datastore/` by default).
@@ -41,22 +45,38 @@ Publications describing [ando-lab/mdx2](https://github.com/ando-lab/mdx2):
 
 ### Prerequisites
 
-For a conda-based installation, you'll need [micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) or equivalent.
+You'll need package manager for conda environments. If you don't have one already, we recommend installing [miniforge](https://github.com/conda-forge/miniforge), which includes conda and mamba commands, and has the conda-forge channel as its default. If you use a different manager, you'll need to add the flag `-c conda-forge`.
 
-### User install (conda environment)
+### User install (miniforge)
 
-```bash
-micromamba create -f https://raw.githubusercontent.com/ando-lab/mdx2/refs/tags/v1.0.3/env.yaml
-micromamba activate mdx2
-pip install mdx2==1.0.3
-```
-
-You'll probably want these packages too:
+Minimal install:
 
 ```bash
-micromamba install -c conda-forge dials nexpy jupyterlab xia2
+mamba create -n mdx2
+mamba activate mdx2
+mamba install mdx2
 ```
 
-### Developer install
+Recommended: add packages for Bragg processing, jupyter notebooks, and nexus visualization
 
-See The Diffuse Project's [fork](https://github.com/diff-use/mdx2) for instructions.
+```bash
+mamba install jupyterlab dials xia2 nexpy
+```
+
+## Contributing
+
+Mdx2 is being developed in collaboration with [The Diffuse Project](https://diffuse.science), and the `dev` branch in the org's fork contains the latest changes: [diff-use/mdx2/tree/dev](https://github.com/diff-use/mdx2/tree/dev).
+
+Contributions can be made by branching from `dev`, and submitting PRs to that branch. When it is time for a new release, the `dev` branch is merged upstream to the `ando-lab/mdx2` repo.
+
+### Developer install (conda + pip from dev branch of diff-use fork)
+
+```bash
+git clone -b dev https://github.com/diff-use/mdx2.git
+cd mdx2
+mamba create -f env.yaml -n mdx2-dev
+mamba activate mdx2-dev
+pip install -e ".[dev]"
+```
+
+The last line installs mdx2 in editable mode, with optional development tools including pytest and ruff.
