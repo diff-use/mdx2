@@ -1,7 +1,4 @@
-<!--[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10519719.svg)](https://doi.org/10.5281/zenodo.10519719)-->
-
-> [!NOTE]
-> This is a fork of [ando-lab/mdx2](https://github.com/ando-lab/mdx2), intended for active development by [The Diffuse Project](https://diffuse.science)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10519719.svg)](https://doi.org/10.5281/zenodo.10519719)
 
 # *mdx2*: macromolecular diffuse scattering data reduction in python
 
@@ -48,30 +45,38 @@ Publications describing [ando-lab/mdx2](https://github.com/ando-lab/mdx2):
 
 ### Prerequisites
 
-For a conda-based installation, you'll need [micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) or equivalent.
+You'll need package manager for conda environments. If you don't have one already, we recommend installing [miniforge](https://github.com/conda-forge/miniforge), which includes conda and mamba commands, and has the conda-forge channel as its default. If you use a different manager, you'll need to add the flag `-c conda-forge`.
 
-### User install (conda environment)
+### User install (miniforge)
+
+Minimal install:
 
 ```bash
-micromamba create -f https://raw.githubusercontent.com/diff-use/mdx2/main/env.yaml
-micromamba activate mdx2
-pip install git+https://github.com/diff-use/mdx2
+mamba create -n mdx2
+mamba activate mdx2
+mamba install mdx2
 ```
 
-You'll probably want these packages too:
+Recommended: add packages for Bragg processing, jupyter notebooks, and nexus visualization
 
 ```bash
-micromamba install -c conda-forge dials nexpy jupyterlab xia2
+mamba install jupyterlab dials xia2 nexpy
 ```
 
-### Developer install (conda environment)
+## Contributing
+
+Mdx2 is being developed in collaboration with [The Diffuse Project](https://diffuse.science), and the `dev` branch in the org's fork contains the latest changes: [diff-use/mdx2/tree/dev](https://github.com/diff-use/mdx2/tree/dev).
+
+Contributions can be made by branching from `dev`, and submitting PRs to that branch. When it is time for a new release, the `dev` branch is merged upstream to the `ando-lab/mdx2` repo.
+
+### Developer install (conda + pip from dev branch of diff-use fork)
 
 ```bash
-git clone https://github.com/diff-use/mdx2.git
+git clone -b dev https://github.com/diff-use/mdx2.git
 cd mdx2
-micromamba create -f env.yaml -n mdx2-dev
-micromamba activate mdx2-dev
+mamba create -f env.yaml -n mdx2-dev
+mamba activate mdx2-dev
 pip install -e ".[dev]"
 ```
 
-The last line installs mdx2 in editable mode, with optional development tools including pytest and ruff
+The last line installs mdx2 in editable mode, with optional development tools including pytest and ruff.
