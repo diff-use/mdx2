@@ -25,8 +25,23 @@ class Parameters:
     wavelength: float = 1.0  # wavelength in Angstroms
     title: str = "mdx2 merged data"  # MTZ title
 
+def get_laue_it_number(it_number):
+    """Maps any Space Group IT number to its symmorphic Laue Group IT number."""
+    # This covers the most common cases (Triclinic through Cubic)
+    if 1 <= it_number <= 2: return 1    # -1
+    if 3 <= it_number <= 15: return 10  # 2/m
+    if 16 <= it_number <= 74: return 47 # mmm
+    if 75 <= it_number <= 88: return 83 # 4/m
+    if 89 <= it_number <= 142: return 123 # 4/mmm
+    if 143 <= it_number <= 148: return 147 # -3
+    if 149 <= it_number <= 167: return 162 # -3m
+    if 168 <= it_number <= 176: return 175 # 6/m
+    if 177 <= it_number <= 194: return 191 # 6/mmm
+    if 195 <= it_number <= 206: return 200 # m-3
+    if 207 <= it_number <= 230: return 221 # m-3m
+    return 1 # Default to P1
 
-def run_to_mtz(params):
+def run_export(params):
     import warnings
 
     import gemmi
@@ -72,8 +87,18 @@ def run_to_mtz(params):
     mtz = gemmi.Mtz(with_base=False)
     mtz.title = params.title
     mtz.cell = gemmi.UnitCell(*super_uc)
-    mtz.spacegroup = gemmi.find_spacegroup_by_name(sg_symbol)
 
+    if any(n != 1 for n in ndiv):
+      sg = gemmi.find_spacegroup_by_name(sg_symbol)
+      laue_it = get_laue_it_number(sg.number)
+      logger.info(
+        "Supercell detected, changing space group to {}",gemmi.SpaceGroup(laue_it).hm
+      )
+      mtz.spacegroup = gemmi.SpaceGroup(laue_it)
+        
+    else:
+      mtz.spacegroup = gemmi.find_spacegroup_by_name(sg_symbol)
+    
     ds = mtz.add_dataset("crystal")
     ds.crystal_name = "crystal"
     ds.project_name = "mdx2"
@@ -106,7 +131,7 @@ def run_to_mtz(params):
 
 
 parse_arguments = make_argument_parser(Parameters, __doc__)
-run = with_parsing(parse_arguments)(with_logging()(run_to_mtz))
+run = with_parsing(parse_arguments)(with_logging()(run_export))
 
 if __name__ == "__main__":
     run()
